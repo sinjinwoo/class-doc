@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
-import type { GroupField } from '../../types/domain'
+import type { GroupField } from '../../../../shared/domain'
 import { Alert, Button, FileDropzone, Modal, Table } from '../ui'
 import { parseCsv } from './csvParse'
 import { FieldConfigList, type FieldConfigEntry } from './FieldConfigList'

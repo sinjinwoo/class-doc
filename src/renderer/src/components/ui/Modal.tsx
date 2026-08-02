@@ -96,13 +96,13 @@ function Modal({
               variant="ghost"
               size="icon"
               icon={<CloseIcon className="h-4 w-4" />}
-              aria-label="Close"
+              aria-label="닫기"
               onClick={onClose}
             />
           </div>
         )}
         {children}
-        {footer && <div className="mt-6 flex justify-end gap-2">{footer}</div>}
+        {footer && <div className="mt-6 flex justify-end gap-3">{footer}</div>}
       </div>
     </div>,
     document.body

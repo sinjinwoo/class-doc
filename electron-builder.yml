@@ -11,6 +11,12 @@ files:
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 asarUnpack:
   - resources/**
+  # @rhwp/core is a pure-ESM WASM package loaded via dynamic `import()` from
+  # main/rhwp/hwpCore.ts, plus a ~7MB rhwp_bg.wasm read via fs.readFileSync at
+  # runtime. Unpacked (rather than left inside app.asar) to sidestep any
+  # asar/ESM-loader interplay that isn't verifiable without a packaged build in
+  # this task's scope — see the reasoning comment in hwpCore.ts.
+  - node_modules/@rhwp/core/**
 win:
   executableName: class-doc
 nsis:

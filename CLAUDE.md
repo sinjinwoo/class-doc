@@ -68,48 +68,125 @@ Electron + React + TypeScript, scaffolded with `@quick-start/create-electron`
 (the official electron-vite template scaffolder — note this is a different
 package from the similarly-named `create-electron-vite`). Process split:
 
-- `src/main/` — Electron main process (Node). Owns app lifecycle and window
-  creation (`index.ts`). `ipc/`, `db/`, `rhwp/` are currently empty
-  placeholders reserved for, respectively: per-domain `ipcMain` handlers,
-  a future `better-sqlite3` connection/migrations, and a headless
-  `@rhwp/core` `HwpDocument` wrapper.
+- `src/main/` — Electron main process (Node). Owns app lifecycle, window
+  creation, and storage bootstrap (`index.ts`).
+  - `paths.ts` — resolves the portable-app storage layout (see "Storage
+    layout" below).
+  - `db/` — `schema.sql` (executable copy of `docs/schema.md` §3's DDL —
+    that doc is the source of truth, keep them in sync), `index.ts` (opens
+    the single `better-sqlite3` connection, sets `PRAGMA foreign_keys = ON`
+    on every connection, migrates via `PRAGMA user_version`), `mappers.ts`
+    (snake_case DB rows ↔ camelCase `shared/domain.ts` types),
+    `identityHash.ts` (the CSV-upsert identity hash algorithm from
+    schema.md §4).
+  - `rhwp/hwpCore.ts` — headless `@rhwp/core` WASM init (dynamic `import()`
+    since `@rhwp/core` is ESM-only and the main bundle is CJS), shared by
+    template field-list extraction and document generation.
+  - `ipc/` — one file per domain (`teacher`, `groups`, `groupFields`,
+    `students`, `templates`, `templateFields`, `generation`), each
+    exporting `register(ipcMain)`, all wired from `ipc/index.ts`. All
+    request validation lives here (renderer is the untrusted-ish
+    boundary); generation progress streams via
+    `webContents.send('generation:progress', ...)`.
+  - `util/fileNaming.ts` — filename sanitize/dedupe shared by template
+    saves and generated-output writes.
 - `src/preload/` — the only bridge between main and renderer
-  (`contextBridge`/`index.ts` + `index.d.ts`). No IPC channels are defined
-  yet; add them here as typed `window.api.*` calls when needed.
-- `src/renderer/` — the React UI. `src/renderer/src/editor/` and
-  `src/renderer/src/pages/` are empty placeholders for, respectively, a
-  future `@rhwp/editor` iframe embed and the app's own screens (e.g. the
-  field-to-meaning mapping screen).
+  (`contextBridge`/`index.ts` + `index.d.ts`). `window.api` is fully typed
+  against `src/shared/ipc-types.ts`'s `Api` interface — one thin
+  `ipcRenderer.invoke(...)` wrapper per IPC channel, plus
+  `onGenerationProgress(callback)` for the progress event stream.
+- `src/shared/` — types/interfaces needed by both main and renderer:
+  `domain.ts` (entities mirroring `docs/schema.md`, moved here from
+  `src/renderer/src/types/` once main-process IPC handlers needed the same
+  shapes) and `ipc-types.ts` (every IPC request/response/event DTO plus the
+  `Api` interface — the single source of truth for preload's
+  implementation and typing).
+- `src/renderer/` — the React UI. `src/renderer/src/editor/` embeds
+  `@rhwp/editor` for the template-editing screen; `src/renderer/src/pages/`
+  holds the app's screens (teacher/group management, student roster,
+  template library + editor, field mapping + generation).
 
-`@rhwp/core` and `@rhwp/editor` are installed and version-pinned but **not
-yet integrated** — no WASM init, no iframe embed, no IPC channel exists for
-them. Before writing that integration, read `.claude/skills/rhwp/SKILL.md`
-— it documents verified constraints from actually testing these packages,
-including: `@rhwp/editor` has no host-callable API to insert merge fields
-(only its own internal "필드 입력" UI menu can do that — a human always
-inserts fields, never the host app); `@rhwp/core` runs headlessly in the
-main process for field read/write/export; and its WASM init requires raw
-bytes via `fs.readFileSync`, not a `file://` URL fetch.
+`@rhwp/core` runs headlessly in the main process (see `src/main/rhwp/hwpCore.ts`)
+for field read/write/export; its WASM init requires raw bytes via
+`fs.readFileSync`/`require.resolve`, not a `file://` URL fetch, and it's
+loaded via a dynamic `import()` (not a static one) because the package is
+ESM-only while the main process's build output is CJS. Before touching this
+integration further, read `.claude/skills/rhwp/SKILL.md` — it documents
+verified constraints from actually testing these packages, including:
+`@rhwp/editor` has no host-callable API to insert merge fields (only its
+own internal "필드 입력" UI menu can do that — a human always inserts
+fields, never the host app).
 
-`better-sqlite3` is intentionally **not installed yet** — it's a native
-addon, and this machine has no MSVC build tools, so a from-source compile
-would fail if no prebuilt binary matches the installed Electron version's
-ABI. Before adding it: `npm install better-sqlite3 && npx electron-builder
-install-app-deps` (wraps `@electron/rebuild`) — if that fails, either
-install MSVC Build Tools or check whether a slightly older Electron minor
-has a published prebuild for this platform.
+**`@rhwp/editor`'s template-editing screen requires an internet
+connection.** `createEditor()` mounts an iframe whose `src` defaults to
+`https://edwardkim.github.io/rhwp/` (verified in
+`node_modules/@rhwp/editor/index.js`) — the npm package only ships the
+`postMessage` transport wrapper, not the editor UI itself, and the SDK
+rejects non-HTTP(S) origins outright (`file:`/`data:` are explicitly
+unsupported), so bundling it for a fully offline `file://` load is not
+possible without a separate effort. This app deliberately ships with the
+default hosted URL (decided explicitly, not a fallback) — the template
+editor screen shows this as a known limitation rather than a silent
+failure. Self-hosting `rhwp-studio` (building that separate repo, vendoring
+its `dist/` output, and running a local `127.0.0.1` static server from
+Electron main) would remove this dependency but is out of scope for now —
+see `src/renderer/src/editor/studioUrl.ts` for where that decision is
+pinned if it needs to change later.
+
+`better-sqlite3` is installed. This machine has no MSVC Build Tools (no
+Windows SDK component), so `node-gyp rebuild` fails — but this turned out
+not to matter: `better-sqlite3@13.x` ships a bundled N-API prebuild
+(`node_modules/better-sqlite3/prebuilds/win32-x64.node`) that loads
+automatically without any compile step, and it works identically under
+plain Node and under Electron's own Node runtime (both verified directly —
+requiring it and round-tripping a real `CREATE TABLE`/`INSERT`/`SELECT`
+succeeded in each). **Do not run `npx electron-builder install-app-deps`
+or otherwise force a native rebuild for this package** — it will fail on
+the missing Windows SDK and isn't needed, since N-API's ABI stability is
+exactly what makes the bundled prebuild usable as-is. If a future
+dependency *isn't* N-API-based and needs an from-source compile, the
+original remediation still applies: install MSVC Build Tools (with the
+Windows SDK component this time) or check whether a slightly older
+Electron minor has a published prebuild for this platform.
+
+## Storage layout
+
+Portable-app style storage (not per-OS AppData): `src/main/paths.ts`
+resolves `<base>/class-doc/{data,template,output}`, auto-creating each
+folder on first access.
+
+- `base` is the folder next to the packaged executable in production
+  (`dirname(app.getPath('exe'))`) — but falls back to the project root
+  (`process.cwd()`) in dev, since "next to the exe" is meaningless under
+  `npm run dev` (`app.getPath('exe')` would point inside
+  `node_modules/electron/dist/`, scattering files there).
+- `class-doc/data/class-doc.sqlite` — the single SQLite file (see
+  `src/main/db/index.ts`).
+- `class-doc/template/` — registered HWPX templates, written by
+  `template:save`'s IPC handler after `@rhwp/editor.exportHwpx()` — the
+  app controls this path directly (no OS "Save As" dialog needed), so
+  saving into this folder is fully automatic from the teacher's
+  perspective.
+- `class-doc/output/` — generated per-student/per-batch HWPX output from
+  `generation:run`. Kept as a sibling of `template/`, not inside it, so
+  generated documents never get mistaken for registered templates.
 
 ## Environment gotchas (this machine)
 
-- **npm's install-scripts allowlist**: `electron`, `esbuild`, and
-  `electron-winstaller` all ship required postinstall/install scripts
-  (e.g. downloading the actual Electron binary). npm blocks these by
-  default; they're allowlisted in `package.json`'s `allowScripts` field.
-  If `npm install` reports scripts blocked again (e.g. after adding a new
-  native/binary-fetching dependency), run
+- **npm's install-scripts allowlist**: `electron`, `esbuild`,
+  `electron-winstaller`, and (as of this app installing it) `better-sqlite3`
+  all ship required postinstall/install scripts (e.g. downloading the
+  actual Electron binary, or `better-sqlite3`'s `node-gyp rebuild`). npm
+  blocks these by default; they're allowlisted in `package.json`'s
+  `allowScripts` field. If `npm install` reports scripts blocked again
+  (e.g. after adding a new native/binary-fetching dependency), run
   `npm install-scripts approve <pkg>` then `npm rebuild <pkg>` — a bare
   `npm install` alone will *not* re-run scripts once npm considers the
-  tree "up to date".
+  tree "up to date". Note that approving+rebuilding doesn't guarantee the
+  script *succeeds* (see `better-sqlite3`'s MSVC/Windows SDK gap above) —
+  it only unblocks npm from attempting it; whether the result is actually
+  needed depends on whether the package has a working fallback (N-API
+  prebuild, in `better-sqlite3`'s case).
 - **Rollup native binary is blocked by a Windows Application Control
   policy on this machine**: `npm run build`/`npm run dev` fail with a
   misleading "npm has a bug related to optional dependencies" error from

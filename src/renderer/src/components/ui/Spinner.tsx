@@ -17,7 +17,7 @@ function Spinner({ size = 'md', className, ...props }: SpinnerProps): React.JSX.
   return (
     <div
       role="status"
-      aria-label="Loading"
+      aria-label="불러오는 중"
       className={cn(
         'animate-spin rounded-full border-2 border-lilac-ash-600 border-t-space-indigo-400',
         sizeClasses[size],

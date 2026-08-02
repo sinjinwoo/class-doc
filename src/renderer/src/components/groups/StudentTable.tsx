@@ -1,4 +1,4 @@
-import type { GroupField, StudentWithValues } from '../../types/domain'
+import type { GroupField, StudentWithValues } from '../../../../shared/domain'
 import { Button, Table } from '../ui'
 import { DeleteIcon, EditIcon } from './icons'
 

@@ -20,7 +20,7 @@ function Sidebar({ items, header, footer, className }: SidebarProps): React.JSX.
   return (
     <aside
       className={cn(
-        'flex w-60 shrink-0 flex-col gap-1 border-r border-lilac-ash-700 bg-lilac-ash-950 p-3',
+        'flex w-64 shrink-0 flex-col gap-1 border-r border-lilac-ash-700 bg-lilac-ash-950 p-4',
         className
       )}
     >
@@ -33,7 +33,7 @@ function Sidebar({ items, header, footer, className }: SidebarProps): React.JSX.
             onClick={item.onClick}
             aria-current={item.active ? 'page' : undefined}
             className={cn(
-              'flex items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-lilac-ash-300 transition-colors duration-150 hover:bg-lilac-ash-800 hover:text-lilac-ash-100',
+              'flex items-center gap-2 rounded-md px-3 py-2.5 text-left text-sm text-lilac-ash-300 transition-colors duration-150 hover:bg-lilac-ash-800 hover:text-lilac-ash-100',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-space-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-lilac-ash-950',
               item.active && 'bg-space-indigo-900 text-space-indigo-200'
             )}

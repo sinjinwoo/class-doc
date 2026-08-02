@@ -1,13 +1,18 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { getDataDir, getTemplateDir, getOutputDir } from './paths'
+import { getDb } from './db'
+import { registerIpcHandlers } from './ipc'
 
 function createWindow(): void {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
+    width: 1360,
+    height: 860,
+    minWidth: 1024,
+    minHeight: 640,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -49,8 +54,14 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // IPC test
-  ipcMain.on('ping', () => console.log('pong'))
+  // Storage layout (<base>/class-doc/{data,template,output}) + DB migration
+  // must both be ready before any renderer/IPC code can touch them.
+  getDataDir()
+  getTemplateDir()
+  getOutputDir()
+  getDb()
+
+  registerIpcHandlers()
 
   createWindow()
 

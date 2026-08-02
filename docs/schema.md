@@ -13,6 +13,18 @@ SQLite DDL(`CHECK`/`UNIQUE`/`FOREIGN KEY ... ON DELETE`)에 최대한 제약을 
 > 구조로 전면 수정했다. `teacher`/`student_group`/`template`/`template_field`(구조)/
 > `generation_run`/`document_history`는 v1에서 그대로 유지되며, `template_field.binding`
 > 은 더 이상 닫힌 CHECK enum이 아니다(§4 참고).
+>
+> **개정 이력(v3)**: §4에서 "템플릿 1개당 매핑 1세트"로 명시적으로 결정하고 §7에
+> YAGNI로 보류해뒀던 그룹별 매핑 오버라이드를, 개발자가 실사용 중 명시적으로 뒤집기로
+> 결정했다. 서로 다른 그룹의 `group_field` 세트가 서로 다른 필드명 관례를 쓸 수 있다는
+> 것이 실제로 확인됐기 때문이다(예: 한 그룹은 "이름", 다른 그룹은 "성명") — 템플릿
+> 하나를 필드명이 다른 그룹에 재사용할 때마다 매핑을 매번 처음부터 다시 해야 하는
+> 문제가 실사용에서 드러났다. `template_field`의 컬럼/의미는 변경하지 않고("템플릿
+> 자체가 기본으로 갖는 매핑"이라는 의미는 그대로 유지, 매핑을 아직 하지 않은 그룹의
+> 폴백으로 계속 쓰인다), §4가 미리 문서화해둔 확장 지점 그대로
+> `template_field_override(template_field_id, group_id, binding, required,
+> default_value)` 테이블을 추가해 (템플릿, 그룹) 쌍 단위로 매핑을 오버라이드할 수
+> 있게 했다. 자세한 이유와 트레이드오프는 §4 "설계 결정(v3로 개정)" 참고.
 
 > **연결 시 필수**: better-sqlite3는 연결마다 외래키 강제를 별도로 켜야 한다.
 > DB 모듈 초기화 시 매번 다음을 실행할 것.
@@ -30,12 +42,12 @@ SQLite DDL(`CHECK`/`UNIQUE`/`FOREIGN KEY ... ON DELETE`)에 최대한 제약을 
 | ②' 학생을 폼으로 1명씩 추가/수정(CSV 없이) | 위와 동일한 3개 테이블 재사용 — 새 테이블 불필요(§4 참고) |
 | ③ 템플릿을 `@rhwp/editor`로 편집·저장 → `<exe 경로>/class-doc/template/`에 저장 → 목록 표시 | `template` |
 | ④ `@rhwp/core.getFieldList()`로 누름틀 추출 → 필드 목록 저장 | `template_field` |
-| ⑤ 템플릿 선택 → 그룹 선택 → 필드↔데이터(그룹의 동적 필드 또는 정적 값) 매핑 | `template_field.binding`(그룹의 `group_field.field_key` 문자열 또는 `'__STATIC__'`) / `.default_value` |
+| ⑤ 템플릿 선택 → 그룹 선택 → 필드↔데이터(그룹의 동적 필드 또는 정적 값) 매핑, (템플릿,그룹) 쌍마다 별도 저장 | `template_field`(템플릿 기본값/폴백) + `template_field_override`((템플릿,그룹) 쌍별 오버라이드, v3) |
 | ⑥ 학생별/목록별 일괄 생성, 성공/실패·오류 메시지 기록 | `generation_run`(배치 헤더) + `document_history`(개별 결과) |
 
-**9개 테이블**: `teacher`, `student_group`, `group_field`, `student`,
-`student_field_value`, `template`, `template_field`, `generation_run`,
-`document_history`.
+**10개 테이블**: `teacher`, `student_group`, `group_field`, `student`,
+`student_field_value`, `template`, `template_field`, `template_field_override`,
+`generation_run`, `document_history`.
 
 `template`/`template_field`는 `.claude/skills/rhwp/references/arcjotectire.md`에 문서화된,
 실제 `@rhwp/core` 테스트로 검증된 구조(`binding`/`scope`/`UNIQUE(template_id, field_name,
@@ -52,7 +64,9 @@ erDiagram
     GROUP_FIELD ||--o{ STUDENT_FIELD_VALUE : "has values in"
     STUDENT ||--o{ STUDENT_FIELD_VALUE : "has values"
     STUDENT_GROUP |o--o{ GENERATION_RUN : "generated for"
+    STUDENT_GROUP ||--o{ TEMPLATE_FIELD_OVERRIDE : "overrides for"
     TEMPLATE ||--o{ TEMPLATE_FIELD : defines
+    TEMPLATE_FIELD ||--o{ TEMPLATE_FIELD_OVERRIDE : "overridden by"
     TEMPLATE |o--o{ GENERATION_RUN : "generated from"
     GENERATION_RUN ||--o{ DOCUMENT_HISTORY : produces
     STUDENT |o--o{ DOCUMENT_HISTORY : "merged into"
@@ -109,6 +123,14 @@ erDiagram
         INTEGER required
         TEXT default_value
         INTEGER display_order
+    }
+    TEMPLATE_FIELD_OVERRIDE {
+        INTEGER id PK
+        INTEGER template_field_id FK
+        INTEGER group_id FK
+        TEXT binding
+        INTEGER required
+        TEXT default_value
     }
     GENERATION_RUN {
         INTEGER id PK
@@ -291,7 +313,32 @@ CREATE TABLE template_field (
 );
 
 -- ─────────────────────────────────────────────────────────
--- 8. generation_run — "생성" 버튼 1회 클릭 = 배치 1건.
+-- 8. template_field_override — (템플릿, 그룹) 쌍별 매핑 오버라이드(v3, §4 참고).
+--    template_field.binding/required/default_value는 "아직 오버라이드하지 않은
+--    그룹"에 보여줄/쓸 폴백으로 의미가 유지된다. 이 테이블에 해당 (template_field_id,
+--    group_id) 행이 있으면 그 값이 우선한다.
+-- ─────────────────────────────────────────────────────────
+CREATE TABLE template_field_override (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    template_field_id  INTEGER NOT NULL,
+    group_id           INTEGER NOT NULL,
+    binding            TEXT NOT NULL CHECK (length(trim(binding)) > 0),
+    required           INTEGER NOT NULL DEFAULT 0 CHECK (required IN (0,1)),
+    default_value      TEXT,
+    FOREIGN KEY (template_field_id) REFERENCES template_field(id) ON DELETE CASCADE,
+    FOREIGN KEY (group_id) REFERENCES student_group(id) ON DELETE CASCADE,
+    UNIQUE (template_field_id, group_id)
+);
+
+-- UNIQUE(template_field_id, group_id)의 자동 인덱스는 선행 컬럼인
+-- template_field_id 단독 조회("이 템플릿 필드의 모든 그룹별 오버라이드")만 커버한다.
+-- group_id 단독 조회("이 그룹이 관련된 모든 오버라이드", 그룹 삭제 시 CASCADE 대상
+-- 조회 등)는 그 인덱스로 커버되지 않는 순수 FK라서 §6의 기존 규칙과 동일하게 명시적
+-- 인덱스를 추가한다.
+CREATE INDEX idx_template_field_override_group_id ON template_field_override(group_id);
+
+-- ─────────────────────────────────────────────────────────
+-- 9. generation_run — "생성" 버튼 1회 클릭 = 배치 1건.
 --    template/group이 나중에 삭제돼도 이력이 읽히도록 이름 스냅샷 보관.
 -- ─────────────────────────────────────────────────────────
 CREATE TABLE generation_run (
@@ -312,7 +359,7 @@ CREATE TABLE generation_run (
 );
 
 -- ─────────────────────────────────────────────────────────
--- 9. document_history — 배치 안의 개별 결과(학생별, 또는 LIST형이면 그룹 전체 1건).
+-- 10. document_history — 배치 안의 개별 결과(학생별, 또는 LIST형이면 그룹 전체 1건).
 -- ─────────────────────────────────────────────────────────
 CREATE TABLE document_history (
     id                    INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -338,6 +385,12 @@ CREATE INDEX idx_generation_run_group_id    ON generation_run(group_id);
 CREATE INDEX idx_document_history_run_id     ON document_history(run_id);
 CREATE INDEX idx_document_history_student_id ON document_history(student_id);
 ```
+
+> `idx_template_field_override_group_id`는 위 `template_field_override` 테이블
+> 정의 바로 아래에 함께 실었다(다른 인덱스들처럼 맨 아래로 몰지 않은 이유: 이
+> 테이블은 v3에서 추가된 것이라 원래 스키마의 "인덱스는 맨 아래에 모아 둔다"는
+> 레이아웃과, 그 레이아웃이 굳어지기 전에 테이블 바로 아래 두던 `group_field`/
+> `student_field_value` 스타일 중 후자를 따랐다 — 어느 쪽이든 기능은 동일하다).
 
 ## 4. 테이블별 설계 근거
 
@@ -517,24 +570,71 @@ EAV에서는 자식 테이블(`student_field_value`) 쓰기이므로, `AFTER INS
    패턴으로 생성을 차단하고 재지정을 유도한다(§ document_history 참고).
 
 **설계 질문: 매핑을 (템플릿, 그룹) 쌍마다 저장해야 하는가, 템플릿 1개당 1세트면
-충분한가?** → **템플릿 1개당 1세트로 결정**(즉 `template_field`에 `group_id`를 넣지
-않음, v1과 동일한 결론이며 EAV로 바뀌어도 유효하다). 근거:
+충분한가? (v3에서 개정)** →
+
+이전 결론(v2 이전)은 **"템플릿 1개당 1세트"**였다(즉 `template_field`에 `group_id`를
+넣지 않음, v1과 동일한 결론이며 EAV로 바뀌어도 유효하다고 판단했었다). 근거는:
 1. `binding`이 표현하는 것은 "이 필드에 어떤 *종류*의 데이터가 들어가는가"라는
-   개념적 매핑이다. 그룹이 달라도 "이 누름틀엔 이름을, 저 누름틀엔 보호자 이름을"
-   같은 매핑 의도 자체는 바뀌지 않는다 — 바뀌는 건 어떤 그룹의 `group_field`
-   집합에서 그 `field_key`를 찾을 것인가일 뿐이다(그래서 그룹 선택은 여전히
-   "어떤 학생 행 집합을 병합할 것인가"만 결정한다).
+   개념적 매핑이고, 그룹이 달라도 "이 누름틀엔 이름을, 저 누름틀엔 보호자 이름을"
+   같은 매핑 의도 자체는 바뀌지 않는다고 봤다 — 바뀌는 건 어떤 그룹의 `group_field`
+   집합에서 그 `field_key`를 찾을 것인가일 뿐이라는 것(그래서 그룹 선택은 여전히
+   "어떤 학생 행 집합을 병합할 것인가"만 결정한다고 봤다).
 2. `'__STATIC__'` 바인딩의 실제 텍스트(`default_value`)는 문서 자체에 귀속되는
-   고정값(예: 문서 제목)이지 그룹에 귀속되는 값이 아니다.
-3. 다만 EAV로 바뀌며 새로 생긴 리스크가 하나 있다: 서로 다른 그룹이 완전히 다른
-   `field_key` 집합을 쓸 수 있으므로, 어떤 템플릿을 자기 그룹과 `field_key`가 안
-   맞는 그룹에 골라 쓰면 매핑 자체가 무의미해진다. 이건 위의 "생성 시점 재검증"으로
-   방어한다 — 즉 그룹별 매핑을 따로 저장하는 대신, 생성 시점 검증을 더 엄격히 하는
-   쪽으로 설계 부담을 옮겼다.
+   고정값(예: 문서 제목)이지 그룹에 귀속되는 값이 아니라는 것.
+3. EAV로 바뀌며 새로 생긴 리스크(서로 다른 그룹이 완전히 다른 `field_key` 집합을
+   쓸 수 있음)는 "생성 시점 재검증"으로 방어할 수 있다는 것 — 즉 그룹별 매핑을 따로
+   저장하는 대신, 생성 시점 검증을 더 엄격히 하는 쪽으로 설계 부담을 옮기는 선택을
+   했었다.
 4. 향후 정말 그룹별 오버라이드가 필요해지면
    `template_field_override(template_id, group_id, field_id, override_value)` 같은
-   보조 테이블을 추가하는 확장이 가능하다 — 지금은 요구되지 않았으므로 YAGNI로
-   보류(§7).
+   보조 테이블을 추가하는 확장이 가능하다는 것을 근거 3의 안전판으로 미리
+   문서화하고, 그 시점엔 요구되지 않았으므로 YAGNI로 보류했다.
+
+**개발자가 이 결론을 명시적으로 뒤집었다 → 지금은 (템플릿, 그룹) 쌍마다 저장하는
+것으로 결정.** 위 근거 1이 실사용에서 깨지는 걸 확인했기 때문이다: "그룹이 달라도
+매핑 의도 자체는 바뀌지 않는다"는 전제는, 서로 다른 그룹의 `group_field` *이름
+자체*가 같은 의미를 다른 문자열로 표현하지는 않는다는 걸 암묵적으로 가정하고
+있었다. 실제로는 한 그룹의 CSV는 "이름" 헤더를, 다른 그룹의 CSV는 "성명" 헤더를
+쓰는 식으로 그룹마다 `field_key` 명명 자체가 달라질 수 있다(§1이 이미 명시한
+"CSV 컬럼은 고정 스키마가 아니다"의 당연한 귀결). `binding`이 그룹의 `field_key`
+문자열 자체를 값으로 저장하는 설계(바로 위 문단)인 이상, "템플릿 1개당 1세트"에서는
+템플릿을 필드명 관례가 다른 그룹에 재사용할 때마다 이미 끝낸 매핑을 처음부터 다시
+해야 한다 — 이건 "생성 시점 재검증"(근거 3)으로 막을 수 있는 무결성 문제가 아니라,
+애초에 그룹마다 다시 매핑해야만 하는 UX 문제였다. 그래서 근거 3에서 안전판으로만
+남겨뒀던 확장 지점(근거 4)을 실제로 도입한다:
+
+```sql
+CREATE TABLE template_field_override (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    template_field_id  INTEGER NOT NULL,
+    group_id           INTEGER NOT NULL,
+    binding            TEXT NOT NULL CHECK (length(trim(binding)) > 0),
+    required           INTEGER NOT NULL DEFAULT 0 CHECK (required IN (0,1)),
+    default_value      TEXT,
+    FOREIGN KEY (template_field_id) REFERENCES template_field(id) ON DELETE CASCADE,
+    FOREIGN KEY (group_id) REFERENCES student_group(id) ON DELETE CASCADE,
+    UNIQUE (template_field_id, group_id)
+);
+```
+
+`template_field.binding`/`default_value`/`required`는 컬럼 의미를 바꾸지 않는다 —
+여전히 "이 템플릿 필드 자체의 기본 매핑"이며, 이제는 **"이 템플릿을 아직 오버라이드
+하지 않은 그룹에 보여줄/쓸 폴백"**이라는 역할이 하나 더 생긴 것뿐이다. 실제 매핑
+읽기는 항상 "이 (template_field_id, group_id) 쌍에 대한 `template_field_override`
+행이 있으면 그 값, 없으면 `template_field`의 기본값" 순서로 해석한다(effective
+mapping — 애플리케이션 레이어에서 LEFT JOIN 등으로 병합, 아래 참고). 문서 생성
+파이프라인(`generation.ts`)은 반드시 이 effective mapping을 읽어야 한다 —
+`template_field`만 읽으면 그룹별 오버라이드가 저장돼도 실제 생성에 반영되지 않는
+치명적인 버그가 된다.
+
+**트레이드오프.** "생성 시점 재검증"(binding이 가리키는 `group_field.field_key`가
+선택된 그룹에 실제로 존재하는가)은 여전히 유효하고 여전히 필요하다 — 오버라이드가
+생겼다고 해서 그 그룹의 `group_field` 구성이 나중에 또 바뀌지 않는다는 보장은 없기
+때문이다. 다만 이제는 "재검증에서 걸릴 확률"이 낮아진다: 애초에 그룹마다 맞는
+`field_key`로 오버라이드해뒀다면 애초부터 안 맞는 매핑을 시도할 일이 줄어든다.
+대가는 매핑 데이터가 늘어난다는 것(템플릿 1개 × 사용한 그룹 수만큼 오버라이드 행이
+생김) — 이 앱의 규모(교사 1인, 그룹 수십 개 이하)에서는 무시할 수 있는 수준으로
+판단했다.
 
 ### `generation_run` / `document_history` — 배치 추적성
 "생성" 1회 클릭은 학생 수만큼(개별형) 또는 그룹 전체 1건(목록형)의 결과를 만든다.
@@ -580,16 +680,20 @@ EAV에서는 자식 테이블(`student_field_value`) 쓰기이므로, `AFTER INS
 | `UNIQUE(student_id, group_field_id)` on `student_field_value` (자동 인덱스) | "특정 학생의 모든 필드 값 조회"(학생 상세 화면, 생성 파이프라인의 값 조회) |
 | `idx_student_field_value_group_field_id` | "특정 필드의 전체 학생 값 조회"(CSV 내보내기, 컬럼 미리보기, 식별/표시 필드 값 일괄 조회) |
 | `UNIQUE(template_id, field_name, scope)` on `template_field` (자동 인덱스) | "이 템플릿의 필드 목록"(`WHERE template_id = ?`) |
+| `UNIQUE(template_field_id, group_id)` on `template_field_override` (자동 인덱스) | "이 템플릿 필드의 그룹별 오버라이드 조회/upsert"(`WHERE template_field_id = ? AND group_id = ?`), 접두 컬럼인 `template_field_id` 단독 조회도 커버(v3) |
+| `idx_template_field_override_group_id` | "이 그룹에 대한 모든 오버라이드 조회"(effective mapping 일괄 계산 시 `WHERE group_id = ?`), `student_group` 삭제 시 `ON DELETE CASCADE`로 지워질 대상 조회 등(v3) |
 | `idx_generation_run_template_id` | "이 템플릿으로 생성된 배치 이력" |
 | `idx_generation_run_group_id` | "이 그룹으로 생성된 배치 이력" |
 | `idx_document_history_run_id` | "이 배치의 개별 결과 목록"(배치 상세 화면) |
 | `idx_document_history_student_id` | "이 학생에게 발급된 문서 이력" |
 
 SQLite는 `UNIQUE` 제약의 왼쪽 접두 컬럼에 대해 자동으로 인덱스를 만들어주므로(예:
-`(group_id, field_key)`의 `group_id` 단독 조회), 위 자동 인덱스로 커버되는 FK
-컬럼(`student_group.teacher_id`, `group_field.group_id`, `student.group_id`,
-`student_field_value.student_id`, `template_field.template_id`)에는 별도 인덱스를
-추가하지 않았다. 반면 `student_field_value.group_field_id`, `generation_run.
+`(group_id, field_key)`의 `group_id` 단독 조회, `(template_field_id, group_id)`의
+`template_field_id` 단독 조회), 위 자동 인덱스로 커버되는 FK 컬럼(`student_group.
+teacher_id`, `group_field.group_id`, `student.group_id`, `student_field_value.
+student_id`, `template_field.template_id`, `template_field_override.
+template_field_id`)에는 별도 인덱스를 추가하지 않았다. 반면 `student_field_value.
+group_field_id`, `template_field_override.group_id`, `generation_run.
 template_id`/`group_id`, `document_history.run_id`/`student_id`는 그런 `UNIQUE`
 접두 커버가 없는 순수 FK라서(SQLite는 FK 컬럼을 자동으로 인덱싱하지 않는다) 명시적
 인덱스를 추가했다.
@@ -668,7 +772,7 @@ template_id`/`group_id`, `document_history.run_id`/`student_id`는 그런 `UNIQU
 | `student` 컬럼 구성 | 고정 컬럼(`grade`/`class_no`/`student_no`/`name`/`gender`/`birthday`) | `group_field`+`student`+`student_field_value`의 동적 EAV 구조 | project.md는 CSV가 고정 스키마라고 암묵적으로 가정했지만, 실제 교사 피드백은 "필드를 감지해서 저장"을 명시적으로 요구했다. 이 요구는 project.md에도, 이 문서의 v1(1차 설계)에도 반영되지 않았던 것이라 이번 리비전에서 정면으로 교체했다. `gender`/`birthday`는 애초에 실제 CSV 계약에 없던 컬럼이라 어차피 제거 대상이었다. |
 | 학생 자연키/재업로드 정책 | 명시 없음(단순 `id` PK만 있고 CSV 매칭 방식 언급 없음, §12에서 "학생 번호 매칭"이라고만 서술) | `group_field.is_identity` + 앱이 계산하는 `student.identity_hash` + `UNIQUE(group_id, identity_hash)` 백스톱 | "재업로드해도 중복 생성되지 않아야 한다"는 요구는 여전하지만, 식별 컬럼 자체가 동적이라 v1의 고정 자연키 방식(`UNIQUE(group_id, grade, class_no, student_no)`)을 그대로 쓸 수 없어 해시 기반으로 재설계했다 — §4에서 대안 비교와 트레이드오프를 명시. |
 | `template_field.binding` enum | 값 목록 없음(project.md), `GENDER`/`BIRTHDAY`/`WRITE_DATE`/`USER` (arcjotectire.md 예시) | 닫힌 `CHECK` enum이 아니라 `TEXT NOT NULL`(그룹의 `group_field.field_key` 또는 `'__STATIC__'`) | 학생 속성 집합 자체가 그룹마다 달라지는 이상, DB가 검증 가능한 고정된 유효값 목록이 존재하지 않는다 — 검증 책임을 매핑 시점 UI 제한 + 생성 시점 재검증이라는 앱 레이어로 명시적으로 옮겼다(§4에서 근거와 재검증 시점을 구체적으로 기술). |
-| 템플릿 매핑 범위 | 명시 없음 | 템플릿 1개당 1세트(그룹별 오버라이드 없음), 근거는 §4 참고 | project.md/요구사항 모두 이 질문에 답을 안 줬으므로 명시적으로 결정하고 근거를 남겼다. EAV로 바뀐 뒤에도 이 결론은 유지되지만, 그룹-템플릿 불일치 리스크를 생성 시점 재검증으로 보완한다는 조건이 새로 붙었다. |
+| 템플릿 매핑 범위 | 명시 없음 | (v3) (템플릿, 그룹) 쌍마다 `template_field_override`로 저장, `template_field`는 미오버라이드 그룹용 폴백 — 근거는 §4 참고 | project.md/요구사항 모두 이 질문에 답을 안 줬으므로 명시적으로 결정하고 근거를 남겼다. 처음엔 "템플릿 1개당 1세트"로 결정했으나(EAV 전환 후에도 그 결론 자체는 유지됐었다), 서로 다른 그룹의 `group_field` 명명 관례가 실제로 달라질 수 있다는 게 실사용에서 확인되어 v3에서 그룹별 오버라이드로 뒤집었다(§4). |
 | `template.file_path` | 자유형 문자열, 저장 규칙 없음 | `file_name`(고정 템플릿 폴더 기준 상대 파일명)으로 명시 | 포터블 앱 특성상 절대경로 저장은 실행파일 이동 시 깨진다 — §4에서 근거 설명. |
 | `document_history` | `id/template_id/student_id/output_path/created_at`만 있고 성공/실패 구분이 없음 | `generation_run`(배치 헤더) 신설 + `document_history`에 `status`/`error_message`/`student_name_snapshot` 추가 | project.md §14(오류 처리 표)가 이미 "필드 없음→생성 중단", "저장 실패→재시도 안내" 같은 실패 케이스를 요구하면서도 정작 `document_history` 테이블에는 그걸 기록할 컬럼이 없었다 — 이 앱이 실제로 쓰는 `setFieldValueByName()`이 실패 시 문자열 예외를 던진다는 사실(rhwp-api-notes.md)까지 고려하면 실패 원인을 남길 컬럼이 필수적이다. |
 | 삭제 시 참조 무결성(`ON DELETE` 정책) | 명시 없음 | 모든 FK에 명시적 `CASCADE`/`SET NULL` 지정, EAV 자식 테이블(`group_field`→`student_field_value`, `student`→`student_field_value`)까지 연쇄 | project.md는 관계를 컬럼 나열로만 제시하고 삭제 전파 정책을 정의하지 않았다. |

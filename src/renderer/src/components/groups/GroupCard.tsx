@@ -1,4 +1,4 @@
-import type { StudentGroup } from '../../types/domain'
+import type { StudentGroup } from '../../../../shared/domain'
 import { Badge, Button, Card } from '../ui'
 import { DeleteIcon, OpenIcon } from './icons'
 

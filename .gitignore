@@ -40,4 +40,10 @@ out
 dist
 .vscode
 
+# Dev-mode runtime storage (src/main/paths.ts resolves this at the project
+# root when app.isPackaged is false) — SQLite file + registered templates,
+# never committed.
+/class-doc/
+class-doc
+img
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,react
