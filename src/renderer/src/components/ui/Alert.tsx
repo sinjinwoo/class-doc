@@ -69,7 +69,7 @@ function Alert({
         <button
           type="button"
           onClick={onDismiss}
-          aria-label="Dismiss"
+          aria-label="닫기"
           className={cn(
             'shrink-0 rounded-md p-0.5 text-current transition-colors duration-150 hover:opacity-75',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-space-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-lilac-ash-900'

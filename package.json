@@ -26,12 +26,14 @@
     "@rhwp/core": "^0.8.2",
     "@rhwp/editor": "^0.8.2",
     "@tailwindcss/vite": "^4.3.3",
+    "better-sqlite3": "^13.0.2",
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "^3.0.0",
     "@electron-toolkit/eslint-config-ts": "^3.1.0",
     "@electron-toolkit/tsconfig": "^2.0.0",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^22.19.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
@@ -53,7 +55,8 @@
     "electron@39.8.10": true,
     "esbuild@0.25.12": true,
     "esbuild@0.28.1": true,
-    "electron-winstaller@5.4.0": true
+    "electron-winstaller@5.4.0": true,
+    "better-sqlite3@13.0.2": true
   },
   "overrides": {
     "rollup": "npm:@rollup/wasm-node@4.62.4"

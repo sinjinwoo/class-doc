@@ -1,6 +1,6 @@
 import type { KeyboardEvent } from 'react'
 import { useEffect, useRef, useState } from 'react'
-import type { GroupField } from '../../types/domain'
+import type { GroupField } from '../../../../shared/domain'
 import { Button, Input, Modal } from '../ui'
 import { PlusIcon } from './icons'
 
@@ -131,7 +131,7 @@ function StudentFormModal({
                 )}
               </div>
             ))}
-            <div className="flex items-end gap-2">
+            <div className="flex items-end gap-3">
               <div className="min-w-0 flex-1">
                 <Input
                   label="새 필드 이름"

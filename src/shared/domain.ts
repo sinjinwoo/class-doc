@@ -1,7 +1,8 @@
-// Renderer-side domain types mirroring docs/schema.md.
-// No IPC/DB wiring exists yet (better-sqlite3 not installed) — these types let
-// UI screens be built against the finalized schema shape now, and wired to
-// real `window.api.*` calls later without reshaping props.
+// Domain types mirroring docs/schema.md, shared between main (IPC payload
+// validation / DB query result shaping) and renderer (component props).
+//
+// Originally lived at src/renderer/src/types/domain.ts back when no IPC/DB
+// wiring existed yet; moved here once src/main/ipc/* needed the same shapes.
 
 export interface Teacher {
   id: number
@@ -57,6 +58,13 @@ export interface Template {
   name: string
   fileName: string
   docType: TemplateDocType
+  // JSON-encoded repeat-row location for LIST-type templates (section/parent
+  // paragraph/control/row indices for @rhwp/core's insertTableRow()). Its
+  // exact shape is still unconfirmed pending a real spike test against a
+  // table+field template (see docs/schema.md §7 and SKILL.md §2/§4) — this
+  // app currently has no UI to populate it, so it is `null` for every
+  // template created so far.
+  repeatRowJson: string | null
   createdAt: string
   updatedAt: string
 }
@@ -76,4 +84,31 @@ export interface TemplateField {
   required: boolean
   defaultValue: string | null
   displayOrder: number | null
+}
+
+export interface GenerationRun {
+  id: number
+  templateId: number | null
+  templateNameSnapshot: string
+  groupId: number | null
+  groupNameSnapshot: string | null
+  docTypeSnapshot: TemplateDocType
+  totalCount: number
+  successCount: number
+  failureCount: number
+  startedAt: string
+  finishedAt: string | null
+}
+
+export type DocumentHistoryStatus = 'SUCCESS' | 'FAILURE'
+
+export interface DocumentHistory {
+  id: number
+  runId: number
+  studentId: number | null
+  studentNameSnapshot: string | null
+  outputPath: string | null
+  status: DocumentHistoryStatus
+  errorMessage: string | null
+  createdAt: string
 }

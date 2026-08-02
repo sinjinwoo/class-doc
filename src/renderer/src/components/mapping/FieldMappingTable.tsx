@@ -1,5 +1,5 @@
-import type { GroupField, TemplateField } from '../../types/domain'
-import { STATIC_BINDING } from '../../types/domain'
+import type { GroupField, TemplateField } from '../../../../shared/domain'
+import { STATIC_BINDING } from '../../../../shared/domain'
 import type { SelectOption } from '../ui'
 import { Badge, Checkbox, Input, Select, Table } from '../ui'
 
