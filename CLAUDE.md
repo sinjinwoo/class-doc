@@ -22,6 +22,46 @@ npm run build:win    # build + electron-builder --win (NSIS)
 
 There is no test suite yet.
 
+## User flow
+
+The app's primary workflow, in order — this drives both the DB schema
+(`docs/schema.md`) and the screens under `src/renderer/src/pages/`:
+
+1. **Teacher profile & groups** — a teacher registers their own name (no
+   password/auth — this is a single local profile, not a login system) and
+   creates one or more **groups** they manage, each with a group name. A
+   group is a teacher-defined named collection of students — it is *not*
+   guaranteed to be exactly one 학년/반 (grade/class), since grade/class/
+   number are recorded per student, not per group.
+2. **Student roster via CSV, or one at a time** — the teacher uploads/
+   re-uploads a CSV per group to populate or update its student roster.
+   CSV columns are **not a fixed schema** — the app detects whatever
+   fields are present from the CSV header row and stores them per group
+   (the same "detect fields, map meaning later" philosophy already used
+   for HWPX 누름틀 — see `template`/`template_field` below). A typical
+   roster has `이름`(name)/`학년`(grade)/`반`(class)/`번호`(student
+   number)/`보호자 이름`(guardian name), but a group's actual field set
+   is whatever that group's CSV defines, and can vary group to group.
+   Re-uploading must update existing students by a natural key, not
+   duplicate them. Students can also be added/edited individually
+   (without a CSV) — same underlying per-group dynamic fields, filled in
+   through a form instead of bulk import.
+3. **Template registration** — the teacher opens/edits an HWPX document via
+   the `@rhwp/editor` iframe and manually inserts 누름틀(fields) using its
+   own "필드 입력" menu (see `.claude/skills/rhwp/SKILL.md` — the host app
+   has no API to insert fields itself). The resulting file is saved to a
+   fixed folder next to the app executable, `class-doc/template/`
+   (portable-app style storage, not per-OS AppData). The app reads that
+   folder and lists templates in a template-library screen; on save,
+   `@rhwp/core.getFieldList()` extracts the template's field names for
+   storage/mapping.
+4. **Field-to-meaning mapping & generation** — from the template list, the
+   teacher picks a template, then picks a group, then maps each 누름틀
+   field to a piece of student data (이름/학년/반/번호/보호자이름) or a
+   static value — this is the one custom screen the app builds (rhwp only
+   knows field *names*, not their meaning). Bulk document generation then
+   runs headlessly per student via `@rhwp/core`.
+
 ## Architecture
 
 Electron + React + TypeScript, scaffolded with `@quick-start/create-electron`
