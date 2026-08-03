@@ -2,6 +2,7 @@ import type { IpcMain } from 'electron'
 import type Database from 'better-sqlite3'
 import { getDb } from '../db'
 import { mapGroupField, type GroupFieldRow } from '../db/mappers'
+import { CONVENTIONAL_DISPLAY_KEYS, CONVENTIONAL_IDENTITY_KEYS } from '../db/identityHash'
 import type { GroupField } from '../../shared/domain'
 
 export function listGroupFields(db: Database.Database, groupId: number): GroupField[] {
@@ -39,33 +40,20 @@ export function setGroupFieldDisplay(db: Database.Database, groupId: number, gro
   txn()
 }
 
-export function setGroupFieldIdentity(
-  db: Database.Database,
-  groupId: number,
-  groupFieldId: number,
-  isIdentity: boolean
-): void {
-  const result = db
-    .prepare('UPDATE group_field SET is_identity = ? WHERE id = ? AND group_id = ?')
-    .run(isIdentity ? 1 : 0, groupFieldId, groupId)
-  if (result.changes === 0) {
-    throw new Error('그룹에서 해당 필드를 찾을 수 없습니다.')
-  }
-}
-
 export interface GroupFieldUpsertInput {
   fieldKey: string
   displayOrder?: number | null
-  isIdentity?: boolean
 }
 
 /**
  * Inserts a group_field row for `fieldKey` if it doesn't exist yet for this
- * group, otherwise patches display_order/is_identity in place (only the
- * properties explicitly provided — `undefined` means "leave unchanged").
- * `is_display` is deliberately NOT settable here: it always goes through
- * `setGroupFieldDisplay` so the "at most 1 per group" invariant has exactly
- * one code path responsible for it.
+ * group, otherwise patches display_order in place (only when explicitly
+ * provided — `undefined` means "leave unchanged"). `is_display`/`is_identity`
+ * are deliberately NOT settable here: there is no more manual UI for either
+ * (teacher feedback: the concept was confusing and unnecessary) — both are
+ * always re-derived by `autoAssignFieldRoles` after any field-set change, so
+ * a single code path owns each invariant ("at most 1 display field per
+ * group", conventional-name-based identity set).
  *
  * Returns the group_field id (existing or newly created).
  */
@@ -80,15 +68,9 @@ export function upsertGroupField(
     .get(groupId, fieldKey) as { id: number } | undefined
 
   if (existing) {
-    if (input.displayOrder !== undefined || input.isIdentity !== undefined) {
-      db.prepare(
-        `UPDATE group_field
-         SET display_order = COALESCE(?, display_order),
-             is_identity = COALESCE(?, is_identity)
-         WHERE id = ?`
-      ).run(
-        input.displayOrder === undefined ? null : input.displayOrder,
-        input.isIdentity === undefined ? null : input.isIdentity ? 1 : 0,
+    if (input.displayOrder !== undefined) {
+      db.prepare('UPDATE group_field SET display_order = ? WHERE id = ?').run(
+        input.displayOrder,
         existing.id
       )
     }
@@ -98,10 +80,45 @@ export function upsertGroupField(
   const result = db
     .prepare(
       `INSERT INTO group_field (group_id, field_key, display_order, is_display, is_identity)
-       VALUES (?, ?, ?, 0, ?)`
+       VALUES (?, ?, ?, 0, 0)`
     )
-    .run(groupId, fieldKey, input.displayOrder ?? null, input.isIdentity ? 1 : 0)
+    .run(groupId, fieldKey, input.displayOrder ?? null)
   return Number(result.lastInsertRowid)
+}
+
+/**
+ * Re-derives is_display/is_identity for every group_field in a group from
+ * conventional roster column names, replacing the manual "표시 필드"/"식별
+ * 필드" pickers this app used to expose. Called after any operation that
+ * changes a group's field set (CSV import, add/delete field, single-student
+ * bootstrap) so both roles stay consistent with whatever fields currently
+ * exist, with no teacher input required:
+ * - identity: fields matching CONVENTIONAL_IDENTITY_KEYS (학년/반/번호) are
+ *   marked is_identity=1; if none of those are present, every field is left
+ *   is_identity=0, which `resolveIdentityFields`'s fallback already turns
+ *   into "hash across every field" — the same safety net this app already
+ *   relied on for groups that never set an identity field explicitly.
+ * - display: if the group already has an is_display=1 field, it's left
+ *   alone (deleting/renaming isn't possible without a fieldKey collision, so
+ *   only a genuinely missing display field needs (re)picking). Otherwise
+ *   prefers a field named 이름/성명, else the first field by display_order.
+ */
+export function autoAssignFieldRoles(db: Database.Database, groupId: number): void {
+  const fields = listGroupFields(db, groupId)
+  if (fields.length === 0) return
+
+  const identityKeys = new Set<string>(CONVENTIONAL_IDENTITY_KEYS)
+  const setIdentity = db.prepare('UPDATE group_field SET is_identity = ? WHERE id = ?')
+  for (const field of fields) {
+    setIdentity.run(identityKeys.has(field.fieldKey) ? 1 : 0, field.id)
+  }
+
+  if (!fields.some((f) => f.isDisplay)) {
+    const preferred =
+      fields.find((f) => (CONVENTIONAL_DISPLAY_KEYS as readonly string[]).includes(f.fieldKey)) ??
+      fields[0]
+    setGroupFieldDisplay(db, groupId, preferred.id)
+  }
 }
 
 function getGroupField(db: Database.Database, groupFieldId: number): GroupField {
@@ -120,11 +137,9 @@ function getGroupField(db: Database.Database, groupFieldId: number): GroupField 
 /**
  * Manual "필드 추가" path (GroupDetailPage), distinct from CSV import's bulk
  * header reconciliation — a teacher adding one field at a time to a group
- * that may already have students. New fields default to
- * is_display=0/is_identity=0 (an existing display/identity field is left
- * alone; `upsertGroupField` never touches is_display, and this call omits
- * isIdentity so it defaults false too) and get appended after the current
- * max display_order so they sort after existing columns in StudentTable.
+ * that may already have students. Appended after the current max
+ * display_order so it sorts after existing columns in StudentTable;
+ * is_display/is_identity are re-derived by `autoAssignFieldRoles` afterward.
  */
 export function createGroupField(db: Database.Database, groupId: number, fieldKey: string): GroupField {
   const trimmed = fieldKey.trim()
@@ -138,6 +153,7 @@ export function createGroupField(db: Database.Database, groupId: number, fieldKe
     fieldKey: trimmed,
     displayOrder: (maxOrder.maxOrder ?? -1) + 1
   })
+  autoAssignFieldRoles(db, groupId)
   return getGroupField(db, id)
 }
 
@@ -147,11 +163,9 @@ export function createGroupField(db: Database.Database, groupId: number, fieldKe
  * column's values. This is the intended "필드 삭제" behavior (per plan
  * feedback: field add/delete must work even after students exist), so no
  * extra guard against "does anyone still have a value here" is added.
- * Deleting the group's current display field is allowed at the DB layer
- * (schema.md §4/§7: "at least 1 display field" is UI-enforced only) —
- * GroupDetailPage already renders a warning `Alert` when
- * `hasDisplayField` is false, so that case is surfaced to the teacher
- * post-delete rather than blocked here.
+ * Deleting the group's current display field re-derives a new one (if any
+ * fields remain) via `autoAssignFieldRoles` instead of leaving the group
+ * without one.
  */
 export function deleteGroupField(db: Database.Database, groupId: number, groupFieldId: number): void {
   const result = db
@@ -160,6 +174,7 @@ export function deleteGroupField(db: Database.Database, groupId: number, groupFi
   if (result.changes === 0) {
     throw new Error('그룹에서 해당 필드를 찾을 수 없습니다.')
   }
+  autoAssignFieldRoles(db, groupId)
 }
 
 export function register(ipcMain: IpcMain): void {
@@ -174,15 +189,4 @@ export function register(ipcMain: IpcMain): void {
   ipcMain.handle('groupField:delete', (_event, payload: { groupId: number; groupFieldId: number }) => {
     deleteGroupField(getDb(), payload.groupId, payload.groupFieldId)
   })
-
-  ipcMain.handle('groupField:setDisplay', (_event, payload: { groupId: number; groupFieldId: number }) => {
-    setGroupFieldDisplay(getDb(), payload.groupId, payload.groupFieldId)
-  })
-
-  ipcMain.handle(
-    'groupField:setIdentity',
-    (_event, payload: { groupId: number; groupFieldId: number; isIdentity: boolean }) => {
-      setGroupFieldIdentity(getDb(), payload.groupId, payload.groupFieldId, payload.isIdentity)
-    }
-  )
 }

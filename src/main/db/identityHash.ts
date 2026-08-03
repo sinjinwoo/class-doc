@@ -42,3 +42,14 @@ export function resolveIdentityFields<T extends { isIdentity: boolean }>(fields:
   const explicit = fields.filter((f) => f.isIdentity)
   return explicit.length > 0 ? explicit : fields
 }
+
+/**
+ * There is no more manual "표시 필드"/"식별 필드" UI (teacher feedback: the
+ * concept was confusing and unnecessary to expose) — group_field roles are
+ * now inferred automatically from conventional roster column names instead
+ * of being picked by hand. These mirror the naming convention already relied
+ * on elsewhere in this app (generation.ts's individual/list output filename
+ * builders use the same 학년/반/번호 triplet).
+ */
+export const CONVENTIONAL_IDENTITY_KEYS = ['학년', '반', '번호'] as const
+export const CONVENTIONAL_DISPLAY_KEYS = ['이름', '성명'] as const

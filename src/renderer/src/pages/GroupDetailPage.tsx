@@ -4,7 +4,6 @@ import { Alert, Button, EmptyState, Spinner, useToast } from '../components/ui'
 import { StudentTable } from '../components/groups/StudentTable'
 import { StudentFormModal } from '../components/groups/StudentFormModal'
 import { CsvImportModal } from '../components/groups/CsvImportModal'
-import type { FieldConfigEntry } from '../components/groups/FieldConfigList'
 import { FieldManageModal } from '../components/groups/FieldManageModal'
 import { ConfirmDialog } from '../components/common/ConfirmDialog'
 
@@ -60,7 +59,6 @@ function GroupDetailPage({ groupId, groupName, onBack }: GroupDetailPageProps): 
     load()
   }, [load])
 
-  const hasDisplayField = fields.some((field) => field.isDisplay)
   const editingStudent = students.find((s) => s.id === editingStudentId) ?? null
   const displayField = fields.find((field) => field.isDisplay)
   const deleteTargetName = deleteTarget
@@ -124,10 +122,10 @@ function GroupDetailPage({ groupId, groupName, onBack }: GroupDetailPageProps): 
 
   async function handleCsvImport(
     rows: Record<string, string>[],
-    fieldConfig: FieldConfigEntry[]
+    fieldKeys: string[]
   ): Promise<void> {
     try {
-      const result = await window.api.studentImportCsv({ groupId, rows, fieldConfig })
+      const result = await window.api.studentImportCsv({ groupId, rows, fieldKeys })
       toast({ type: 'success', message: `${result.imported}명의 학생 정보를 가져왔습니다.` })
       await load()
     } catch (e) {
@@ -143,13 +141,13 @@ function GroupDetailPage({ groupId, groupName, onBack }: GroupDetailPageProps): 
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" onClick={onBack}>
+          <Button variant="secondary" onClick={onBack}>
             ← 그룹 목록
           </Button>
           <h2 className="text-lg font-semibold text-lilac-ash-50">{groupName}</h2>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" onClick={() => setFieldManageModalOpen(true)}>
+          <Button variant="secondary" onClick={() => setFieldManageModalOpen(true)}>
             필드 관리
           </Button>
           <Button variant="secondary" onClick={() => setCsvModalOpen(true)}>
@@ -176,7 +174,7 @@ function GroupDetailPage({ groupId, groupName, onBack }: GroupDetailPageProps): 
           description="CSV 파일을 가져오거나 학생을 한 명 추가하면, 이름/학년/반 같은 필드가 자동으로 설정됩니다. '필드 관리'에서 직접 필드를 추가할 수도 있습니다."
           action={
             <div className="flex gap-2">
-              <Button variant="ghost" onClick={() => setFieldManageModalOpen(true)}>
+              <Button variant="secondary" onClick={() => setFieldManageModalOpen(true)}>
                 필드 관리
               </Button>
               <Button variant="secondary" onClick={() => setCsvModalOpen(true)}>
@@ -185,12 +183,6 @@ function GroupDetailPage({ groupId, groupName, onBack }: GroupDetailPageProps): 
               <Button onClick={handleAddStudentClick}>학생 추가</Button>
             </div>
           }
-        />
-      ) : !hasDisplayField ? (
-        <Alert
-          type="warning"
-          message="이 그룹에 표시 필드가 지정되지 않았습니다."
-          detail="표시 필드는 학생 목록과 생성된 문서 이력에서 학생을 구분하는 이름 역할을 하는 필드입니다(예: 이름). 위의 '필드 관리'에서 필드 1개를 표시 필드로 지정해 주세요."
         />
       ) : (
         <StudentTable
@@ -204,7 +196,6 @@ function GroupDetailPage({ groupId, groupName, onBack }: GroupDetailPageProps): 
       <CsvImportModal
         open={csvModalOpen}
         onClose={() => setCsvModalOpen(false)}
-        existingFields={fields}
         onImport={handleCsvImport}
       />
 

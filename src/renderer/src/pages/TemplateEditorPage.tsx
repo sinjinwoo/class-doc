@@ -156,7 +156,7 @@ function TemplateEditorPage({
   return (
     <div className="flex h-full flex-col gap-4">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" onClick={onCancel}>
+        <Button variant="secondary" onClick={onCancel}>
           ← 템플릿 목록
         </Button>
         <h2 className="text-lg font-semibold text-lilac-ash-50">

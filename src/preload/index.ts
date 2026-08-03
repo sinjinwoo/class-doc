@@ -18,8 +18,6 @@ const api: Api = {
   groupFieldList: (payload) => ipcRenderer.invoke('groupField:list', payload),
   groupFieldCreate: (payload) => ipcRenderer.invoke('groupField:create', payload),
   groupFieldDelete: (payload) => ipcRenderer.invoke('groupField:delete', payload),
-  groupFieldSetDisplay: (payload) => ipcRenderer.invoke('groupField:setDisplay', payload),
-  groupFieldSetIdentity: (payload) => ipcRenderer.invoke('groupField:setIdentity', payload),
 
   studentListWithValues: (payload) => ipcRenderer.invoke('student:listWithValues', payload),
   studentCreateOrUpdate: (payload) => ipcRenderer.invoke('student:createOrUpdate', payload),
@@ -36,7 +34,11 @@ const api: Api = {
   templateFieldList: (payload) => ipcRenderer.invoke('templateField:list', payload),
   templateFieldUpdateMapping: (payload) => ipcRenderer.invoke('templateField:updateMapping', payload),
 
-  generationRun: (payload) => ipcRenderer.invoke('generation:run', payload),
+  generationPrepare: (payload) => ipcRenderer.invoke('generation:prepare', payload),
+  generationRenderPreviewPage: (payload) =>
+    ipcRenderer.invoke('generation:renderPreviewPage', payload),
+  generationCommit: (payload) => ipcRenderer.invoke('generation:commit', payload),
+  generationDiscardPreview: (payload) => ipcRenderer.invoke('generation:discardPreview', payload),
   generationPickOutputDir: () => ipcRenderer.invoke('generation:pickOutputDir'),
   onGenerationProgress: (callback) => {
     const listener = (_event: Electron.IpcRendererEvent, progress: GenerationProgressEvent): void =>

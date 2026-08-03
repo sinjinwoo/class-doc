@@ -3,7 +3,7 @@ import type Database from 'better-sqlite3'
 import { getDb } from '../db'
 import { mapStudent, type StudentRow } from '../db/mappers'
 import { computeIdentityHash, normalizeFieldValue, resolveIdentityFields } from '../db/identityHash'
-import { listGroupFields, setGroupFieldDisplay, upsertGroupField } from './groupFields'
+import { autoAssignFieldRoles, listGroupFields, upsertGroupField } from './groupFields'
 import type { StudentWithValues } from '../../shared/domain'
 import type {
   StudentCreateOrUpdateRequest,
@@ -95,26 +95,20 @@ function createOrUpdateStudent(db: Database.Database, payload: StudentCreateOrUp
     // Bootstrap case: a brand-new group has no group_field rows yet (see
     // docs/schema.md §4 — a group needs at least one group_field before a
     // student can be added, via either a CSV import or, here, the first
-    // manually-entered student's own field keys). StudentFormModal's own UI
-    // already tells the teacher "첫 필드는 표시 필드 및 식별 필드로
-    // 사용됩니다" for exactly this case, so the first incoming key is
-    // mirrored here as is_display=1 + is_identity=1; any other brand-new key
-    // (added later, outside the bootstrap moment) gets both flags off — the
-    // teacher can promote it afterwards via groupField:setDisplay/
-    // setIdentity. This bootstrap default is a judgment call: the plan only
-    // specifies this handler's I/O shape, not this particular default.
-    const isBootstrap = fields.length === 0
+    // manually-entered student's own field keys). Any brand-new key gets
+    // created with no role yet; `autoAssignFieldRoles` below derives
+    // is_display/is_identity for the whole group afterward (from
+    // conventional roster column names — there's no more manual "표시
+    // 필드"/"식별 필드" picker to fall back on).
+    let addedNewField = false
     incomingKeys.forEach((key, index) => {
       if (existingKeys.has(key)) return
-      const groupFieldId = upsertGroupField(db, groupId, {
-        fieldKey: key,
-        displayOrder: fields.length + index,
-        isIdentity: isBootstrap && index === 0
-      })
-      if (isBootstrap && index === 0) {
-        setGroupFieldDisplay(db, groupId, groupFieldId)
-      }
+      upsertGroupField(db, groupId, { fieldKey: key, displayOrder: fields.length + index })
+      addedNewField = true
     })
+    if (addedNewField) {
+      autoAssignFieldRoles(db, groupId)
+    }
 
     fields = listGroupFields(db, groupId)
     const fieldByKey = new Map(fields.map((f) => [f.fieldKey, f]))
@@ -159,31 +153,18 @@ function createOrUpdateStudent(db: Database.Database, payload: StudentCreateOrUp
 }
 
 function importCsv(db: Database.Database, payload: StudentImportCsvRequest): StudentImportCsvResult {
-  const { groupId, rows, fieldConfig } = payload
-
-  const displayEntries = fieldConfig.filter((f) => f.isDisplay)
-  if (displayEntries.length > 1) {
-    throw new Error('표시 필드는 한 개만 지정할 수 있습니다.')
-  }
+  const { groupId, rows, fieldKeys } = payload
 
   const imported = db.transaction(() => {
     // 1. Reconcile this group's group_field definitions against the CSV's
-    //    header set (docs/schema.md §4 upsert algorithm, step 1).
-    fieldConfig.forEach((entry, index) => {
-      upsertGroupField(db, groupId, {
-        fieldKey: entry.fieldKey,
-        displayOrder: index,
-        isIdentity: entry.isIdentity
-      })
+    //    header set (docs/schema.md §4 upsert algorithm, step 1), then
+    //    re-derive is_display/is_identity from conventional column names —
+    //    there's no more manual "표시 필드"/"식별 필드" picker in the import
+    //    wizard.
+    fieldKeys.forEach((fieldKey, index) => {
+      upsertGroupField(db, groupId, { fieldKey, displayOrder: index })
     })
-
-    if (displayEntries.length === 1) {
-      const fields = listGroupFields(db, groupId)
-      const target = fields.find((f) => f.fieldKey === displayEntries[0].fieldKey)
-      if (target) {
-        setGroupFieldDisplay(db, groupId, target.id)
-      }
-    }
+    autoAssignFieldRoles(db, groupId)
 
     const fields = listGroupFields(db, groupId)
     const fieldByKey = new Map(fields.map((f) => [f.fieldKey, f]))
@@ -197,11 +178,11 @@ function importCsv(db: Database.Database, payload: StudentImportCsvRequest): Stu
       )
       const { studentId } = upsertStudentRow(db, groupId, identityHash)
 
-      const entries = fieldConfig
-        .map((entry) => {
-          const field = fieldByKey.get(entry.fieldKey)
+      const entries = fieldKeys
+        .map((fieldKey) => {
+          const field = fieldByKey.get(fieldKey)
           if (!field) return null
-          return { groupFieldId: field.id, value: normalizeFieldValue(row[entry.fieldKey]) }
+          return { groupFieldId: field.id, value: normalizeFieldValue(row[fieldKey]) }
         })
         .filter((e): e is { groupFieldId: number; value: string } => e !== null)
 

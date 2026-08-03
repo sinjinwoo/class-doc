@@ -2,25 +2,6 @@ import type { SVGProps } from 'react'
 
 export type IconProps = SVGProps<SVGSVGElement>
 
-function OpenIcon(props: IconProps): React.JSX.Element {
-  return (
-    <svg
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      {...props}
-    >
-      <path d="M8 4H4v12h12v-4" />
-      <path d="M11 4h5v5" />
-      <path d="M16 4 9 11" />
-    </svg>
-  )
-}
-
 function EditIcon(props: IconProps): React.JSX.Element {
   return (
     <svg
@@ -74,4 +55,4 @@ function PlusIcon(props: IconProps): React.JSX.Element {
   )
 }
 
-export { OpenIcon, EditIcon, DeleteIcon, PlusIcon }
+export { EditIcon, DeleteIcon, PlusIcon }

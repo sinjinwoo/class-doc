@@ -73,22 +73,29 @@ function Modal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-lilac-ash-950/80 transition-opacity duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-lilac-ash-950/80 p-4 transition-opacity duration-150"
       onClick={onClose}
     >
+      {/* Capped at 85vh + flex-column with its own overflow-y-auto middle
+          section (not the whole panel) — a modal taller than the window
+          (a long field list, a big CSV preview) used to just render past the
+          screen edges with nothing scrollable, hiding its own footer buttons
+          ("다음", "가져오기", ...) below the fold. Header/footer stay
+          `shrink-0` so they're always reachable regardless of how tall the
+          middle content gets. */}
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
         className={cn(
-          'w-full max-w-lg rounded-lg border border-lilac-ash-700 bg-lilac-ash-900 p-6 shadow-xl transition-transform duration-150',
+          'flex max-h-[85vh] w-full max-w-lg flex-col rounded-lg border border-lilac-ash-700 bg-lilac-ash-900 shadow-xl transition-transform duration-150',
           className
         )}
         onClick={(event) => event.stopPropagation()}
       >
         {title && (
-          <div className="mb-4 flex items-center justify-between">
+          <div className="flex shrink-0 items-center justify-between px-6 pt-6 pb-4">
             <h3 id={titleId} className="text-base font-semibold text-lilac-ash-50">
               {title}
             </h3>
@@ -101,8 +108,14 @@ function Modal({
             />
           </div>
         )}
-        {children}
-        {footer && <div className="mt-6 flex justify-end gap-3">{footer}</div>}
+        <div className={cn('min-h-0 flex-1 overflow-y-auto px-6', title ? 'pt-0' : 'pt-6', !footer && 'pb-6')}>
+          {children}
+        </div>
+        {footer && (
+          <div className="flex shrink-0 justify-end gap-3 border-t border-lilac-ash-800 px-6 py-4">
+            {footer}
+          </div>
+        )}
       </div>
     </div>,
     document.body

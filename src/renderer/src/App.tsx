@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Teacher } from '../../shared/domain'
-import { Layout, Sidebar, Spinner, Topbar } from './components/ui'
+import { Button, Layout, Sidebar, Spinner, Topbar, useToast } from './components/ui'
 import type { SidebarNavItem } from './components/ui'
 import { FirstRunGate } from './pages/FirstRunGate'
 import { GroupsPage } from './pages/GroupsPage'
@@ -9,6 +9,8 @@ import { TemplateLibraryPage } from './pages/TemplateLibraryPage'
 import type { PickedTemplateFile } from './pages/TemplateLibraryPage'
 import { TemplateEditorPage } from './pages/TemplateEditorPage'
 import { MappingGenerationPage } from './pages/MappingGenerationPage'
+import { TeacherFormModal } from './components/common/TeacherFormModal'
+import { EditIcon } from './components/groups/icons'
 
 type View =
   | { name: 'groups' }
@@ -19,7 +21,7 @@ type View =
 
 const VIEW_TITLES: Record<View['name'], string> = {
   groups: '그룹 관리',
-  'group-detail': '학생 명단',
+  'group-detail': '그룹원',
   templates: '템플릿 라이브러리',
   'template-editor': '템플릿 편집',
   'mapping-generation': '필드 매핑 및 문서 생성'
@@ -30,8 +32,10 @@ const VIEW_TITLES: Record<View['name'], string> = {
 // `useState` view-switching, driven by the Sidebar and callbacks handed down
 // to each page.
 function App(): React.JSX.Element {
+  const { toast } = useToast()
   const [teacher, setTeacher] = useState<Teacher | null | 'loading'>('loading')
   const [view, setView] = useState<View>({ name: 'groups' })
+  const [teacherModalOpen, setTeacherModalOpen] = useState(false)
 
   useEffect(() => {
     window.api
@@ -56,6 +60,21 @@ function App(): React.JSX.Element {
   // 'loading'`) by the two early returns above — avoids `as Teacher` casts
   // in the JSX/closures below.
   const currentTeacher: Teacher = teacher
+
+  async function handleUpdateTeacherName(name: string): Promise<void> {
+    try {
+      const updated = await window.api.teacherUpdate({ id: currentTeacher.id, name })
+      setTeacher(updated)
+      setTeacherModalOpen(false)
+      toast({ type: 'success', message: '이름을 변경했습니다.' })
+    } catch (e) {
+      toast({
+        type: 'error',
+        message: '이름을 변경하지 못했습니다.',
+        detail: e instanceof Error ? e.message : String(e)
+      })
+    }
+  }
 
   const navItems: SidebarNavItem[] = [
     {
@@ -119,6 +138,7 @@ function App(): React.JSX.Element {
         return (
           <MappingGenerationPage
             teacherId={currentTeacher.id}
+            teacherName={currentTeacher.name}
             initialTemplateId={view.templateId}
             initialGroupId={view.groupId}
           />
@@ -138,9 +158,27 @@ function App(): React.JSX.Element {
           }
         />
       }
-      topbar={<Topbar title={VIEW_TITLES[view.name]}>{currentTeacher.name} 선생님</Topbar>}
+      topbar={
+        <Topbar title={VIEW_TITLES[view.name]}>
+          <span>{currentTeacher.name} 선생님</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            icon={<EditIcon className="h-4 w-4" />}
+            aria-label="선생님 이름 변경"
+            onClick={() => setTeacherModalOpen(true)}
+          />
+        </Topbar>
+      }
     >
       {renderPage()}
+
+      <TeacherFormModal
+        open={teacherModalOpen}
+        onClose={() => setTeacherModalOpen(false)}
+        onSubmit={handleUpdateTeacherName}
+        initialName={currentTeacher.name}
+      />
     </Layout>
   )
 }
