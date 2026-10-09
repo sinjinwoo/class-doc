@@ -10,11 +10,16 @@ import type {
   StudentDeleteRequest,
   StudentImportCsvRequest,
   StudentImportCsvResult,
-  StudentListWithValuesRequest
+  StudentListWithValuesRequest,
+  StudentParseSpreadsheetRequest
 } from '../../shared/ipc-types'
+import { parseXlsx } from '../util/spreadsheet'
 
 /** Reused by generation.ts, which needs the same per-student value shape. */
-export function listStudentsWithValues(db: Database.Database, groupId: number): StudentWithValues[] {
+export function listStudentsWithValues(
+  db: Database.Database,
+  groupId: number
+): StudentWithValues[] {
   const students = db
     .prepare(
       'SELECT id, group_id, identity_hash, created_at, updated_at FROM student WHERE group_id = ? ORDER BY id'
@@ -84,7 +89,10 @@ function upsertStudentFieldValues(
  * from is_identity fields, upsert student + student_field_value rows" per
  * docs/schema.md §4's algorithm.
  */
-function createOrUpdateStudent(db: Database.Database, payload: StudentCreateOrUpdateRequest): StudentWithValues {
+function createOrUpdateStudent(
+  db: Database.Database,
+  payload: StudentCreateOrUpdateRequest
+): StudentWithValues {
   const { groupId } = payload
 
   const studentId = db.transaction(() => {
@@ -126,7 +134,10 @@ function createOrUpdateStudent(db: Database.Database, payload: StudentCreateOrUp
       if (!existingStudent) {
         throw new Error('학생을 찾을 수 없습니다.')
       }
-      db.prepare('UPDATE student SET identity_hash = ? WHERE id = ?').run(identityHash, payload.studentId)
+      db.prepare('UPDATE student SET identity_hash = ? WHERE id = ?').run(
+        identityHash,
+        payload.studentId
+      )
       resolvedStudentId = payload.studentId
     } else {
       resolvedStudentId = upsertStudentRow(db, groupId, identityHash).studentId
@@ -152,7 +163,10 @@ function createOrUpdateStudent(db: Database.Database, payload: StudentCreateOrUp
   return student
 }
 
-function importCsv(db: Database.Database, payload: StudentImportCsvRequest): StudentImportCsvResult {
+function importCsv(
+  db: Database.Database,
+  payload: StudentImportCsvRequest
+): StudentImportCsvResult {
   const { groupId, rows, fieldKeys } = payload
 
   const imported = db.transaction(() => {
@@ -210,5 +224,12 @@ export function register(ipcMain: IpcMain): void {
 
   ipcMain.handle('student:importCsv', (_event, payload: StudentImportCsvRequest) => {
     return importCsv(getDb(), payload)
+  })
+
+  ipcMain.handle('student:parseSpreadsheet', (_event, payload: StudentParseSpreadsheetRequest) => {
+    if (!(payload?.bytes instanceof Uint8Array)) {
+      throw new Error('엑셀 파일 데이터가 올바르지 않습니다.')
+    }
+    return parseXlsx(payload.bytes)
   })
 }

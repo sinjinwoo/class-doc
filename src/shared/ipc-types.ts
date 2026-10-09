@@ -76,6 +76,14 @@ export interface StudentImportCsvRequest {
 export interface StudentImportCsvResult {
   imported: number
 }
+/** An .xlsx roster, parsed in main into the same shape as the renderer's CSV parser. */
+export interface StudentParseSpreadsheetRequest {
+  bytes: Uint8Array
+}
+export interface StudentParseSpreadsheetResult {
+  headers: string[]
+  rows: Record<string, string>[]
+}
 
 // ── templates ───────────────────────────────────────────────────────────
 export interface TemplatePickFileResult {
@@ -196,6 +204,13 @@ export interface GenerationProgressEvent {
 export const GENERATION_PROGRESS_CHANNEL = 'generation:progress' as const
 
 // ── the full renderer-facing API surface ───────────────────────────────
+// ── app ─────────────────────────────────────────────────────────────────
+export interface AppUpdateStatus {
+  currentVersion: string
+  /** Set only when a newer release than currentVersion is published. */
+  update: { version: string; url: string } | null
+}
+
 export interface Api {
   teacherGet(): Promise<Teacher | null>
   teacherCreate(payload: TeacherCreateRequest): Promise<Teacher>
@@ -214,6 +229,9 @@ export interface Api {
   studentCreateOrUpdate(payload: StudentCreateOrUpdateRequest): Promise<StudentWithValues>
   studentDelete(payload: StudentDeleteRequest): Promise<void>
   studentImportCsv(payload: StudentImportCsvRequest): Promise<StudentImportCsvResult>
+  studentParseSpreadsheet(
+    payload: StudentParseSpreadsheetRequest
+  ): Promise<StudentParseSpreadsheetResult>
 
   templateList(): Promise<Template[]>
   templatePickFile(): Promise<TemplatePickFileResult | null>
@@ -236,4 +254,11 @@ export interface Api {
 
   /** Local http://127.0.0.1 URL of the self-hosted rhwp-studio (the editor iframe). */
   studioGetUrl(): Promise<string>
+
+  /** Notify-only update check (once per run; silent on failure/offline). */
+  appGetUpdateStatus(): Promise<AppUpdateStatus>
+  /** Opens the newer release's page in the default browser. */
+  appOpenUpdatePage(): Promise<void>
+  /** Opens the class-doc data folder (DB/templates/outputs) in Explorer. */
+  appOpenDataFolder(): Promise<void>
 }

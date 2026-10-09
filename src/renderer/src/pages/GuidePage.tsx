@@ -87,10 +87,11 @@ const SECTIONS: GuideSection[] = [
         )
       },
       {
-        title: 'CSV 파일로 명단 한 번에 올리기',
+        title: '엑셀·CSV 파일로 명단 한 번에 올리기',
         body: (
           <>
-            <Ui>CSV 가져오기</Ui>를 누르고 CSV 파일을 창에 끌어다 놓거나, 눌러서 선택합니다. 파일의
+            <Ui>명단 가져오기</Ui>를 누르고 엑셀(.xlsx)이나 CSV 파일을 창에 끌어다 놓거나, 눌러서
+            선택합니다. 파일의
             <strong className="font-semibold text-bone-white"> 첫 줄(제목 줄)</strong>이 그대로 학생
             정보의 항목(필드)이 돼요. <Ui>다음</Ui>을 눌러 미리보기 표를 확인한 뒤 <Ui>가져오기</Ui>
             를 누르면 끝입니다.
@@ -102,7 +103,9 @@ const SECTIONS: GuideSection[] = [
             text: (
               <>
                 예시 첫 줄:{' '}
-                <span className="font-semibold text-bone-white">이름,학년,반,번호,보호자 이름</span>{' '}
+                <span className="font-semibold text-bone-white">
+                  반 · 번호 · 이름 · 보호자 이름
+                </span>{' '}
                 — 항목은 정해져 있지 않아서 그룹마다 달라도 됩니다.
               </>
             )
@@ -111,9 +114,8 @@ const SECTIONS: GuideSection[] = [
             kind: 'caution',
             text: (
               <>
-                엑셀에서 저장할 때 파일 형식을{' '}
-                <strong className="font-semibold">‘CSV UTF-8(쉼표로 분리)’</strong>로 골라야 한글이
-                깨지지 않아요.
+                엑셀 파일은 <strong className="font-semibold">첫 번째 시트</strong>만 읽어요. 예전
+                형식인 .xls 파일은 엑셀에서 ‘.xlsx’로 다시 저장한 뒤 가져와 주세요.
               </>
             )
           }
@@ -220,8 +222,8 @@ const SECTIONS: GuideSection[] = [
         body: (
           <>
             학생마다 달라질 자리에 커서를 두고, 편집기 메뉴의 <Ui>입력</Ui> → <Ui>필드 입력</Ui>
-            (단축키 Ctrl+K+E)을 누릅니다. ‘필드 이름’에 이름·번호처럼 알아보기 쉬운 이름을 적고
-            확인하세요. 필요한 자리마다 반복하면 됩니다.
+            (단축키: Ctrl+K를 누른 뒤 E)을 누릅니다. ‘필드 이름’에 이름·번호처럼 알아보기 쉬운
+            이름을 적고 확인하세요. 필요한 자리마다 반복하면 됩니다.
           </>
         ),
         notes: [
@@ -236,27 +238,21 @@ const SECTIONS: GuideSection[] = [
         ]
       },
       {
-        title: '템플릿 이름과 문서 유형 정하기',
+        title: '템플릿 이름 정하기',
         body: (
           <>
-            편집기 위쪽의 ‘템플릿 이름’을 확인하고(처음에는 파일 이름이 들어가 있어요), ‘문서
-            유형’은 <strong className="font-semibold text-bone-white">개별형</strong>으로 둡니다.
-            개별형은 학생 한 명마다 같은 서식이 한 부씩 채워지는 문서예요.
+            편집기 위쪽의 ‘템플릿 이름’을 확인합니다. 처음에는 파일 이름이 들어가 있으니, 알아보기
+            쉬운 이름으로 바꿔도 좋아요. 템플릿 하나로 학생 한 명마다 같은 서식이 한 부씩
+            채워집니다.
           </>
-        ),
-        notes: [
-          {
-            kind: 'caution',
-            text: '문서 유형은 ‘개별형’을 사용해 주세요. 다른 유형은 아직 준비 중이라 문서가 제대로 만들어지지 않을 수 있어요.'
-          }
-        ]
+        )
       },
       {
         title: '저장하기',
         body: (
           <>
-            화면 아래의 <Ui>저장</Ui>을 누르면 템플릿이 등록되고, 넣어 둔 누름틀 목록이 자동으로
-            읽혀요. 저장이 끝나면 바로 <Ui>문서 생성</Ui> 화면으로 넘어갑니다.
+            템플릿 이름 오른쪽의 <Ui>저장</Ui>을 누르면 템플릿이 등록되고, 넣어 둔 누름틀 목록이
+            자동으로 읽혀요. 저장이 끝나면 바로 <Ui>문서 생성</Ui> 화면으로 넘어갑니다.
           </>
         ),
         notes: [
@@ -493,6 +489,47 @@ function GuidePage({ onNavigate }: GuidePageProps): React.JSX.Element {
           반 등록 → 템플릿 등록 → 문서 생성 순서로 진행하면 됩니다. 처음 한 번만 준비해 두면,
           다음부터는 문서 생성만으로 반 전체의 문서를 바로 만들 수 있어요.
         </p>
+        {/* Keep in sync with reality: all data lives in the local class-doc/
+            folder (SQLite + template/output files); the only external request
+            is src/main/updateCheck.ts's release-metadata GET (no user data).
+            Adding any other network feature means updating this text. */}
+        <div className="mt-3 flex max-w-3xl flex-col gap-1.5 rounded-panel border border-line bg-surface px-5 py-4">
+          <p className="text-label font-medium uppercase text-saffron-spark">개인정보 안내</p>
+          <p className="text-sm leading-relaxed text-silver-mist">
+            학생 명단, 템플릿, 만들어진 문서 등 모든 정보는{' '}
+            <strong className="font-semibold text-bone-white">선생님의 컴퓨터 안에서만</strong>{' '}
+            다루어지며, 외부로 전송되지 않습니다. 모든 자료는 프로그램 옆의{' '}
+            <span className="text-bone-white">class-doc</span> 폴더에 저장되고, 편집기를 포함한 모든
+            기능이 인터넷 연결 없이 동작합니다. 인터넷에 연결되어 있으면 새 버전이 나왔는지만
+            확인하며, 이때도 학생 정보는 전혀 보내지 않습니다.
+          </p>
+        </div>
+        {/* Mirrors src/main/paths.ts: packaged builds store everything in
+            <folder of the .exe>/class-doc/{data,template,output}. */}
+        <div className="flex max-w-3xl flex-col gap-1.5 rounded-panel border border-line bg-surface px-5 py-4">
+          <p className="text-label font-medium uppercase text-saffron-spark">
+            다른 컴퓨터에서 이어 쓰기
+          </p>
+          <p className="text-sm leading-relaxed text-silver-mist">
+            프로그램(실행 파일)이 있는 폴더의 <span className="text-bone-white">class-doc</span>{' '}
+            폴더를 통째로 복사해, 다른 컴퓨터에서도{' '}
+            <strong className="font-semibold text-bone-white">프로그램과 같은 위치</strong>에 두고
+            실행하면 등록한 반, 템플릿, 만든 문서가 그대로 유지됩니다. 새 버전을 설치하거나
+            프로그램을 지워도 이 폴더는 지워지지 않아요.
+          </p>
+          <div className="mt-1">
+            {/* Secondary, not primary: violet stays reserved for each tab's
+                single "…로 이동" action below. */}
+            <Button
+              variant="secondary"
+              onClick={() => {
+                window.api.appOpenDataFolder().catch(() => {})
+              }}
+            >
+              데이터 폴더 열기
+            </Button>
+          </div>
+        </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as GuideTab)}>

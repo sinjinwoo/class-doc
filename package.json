@@ -28,6 +28,7 @@
     "@rhwp/editor": "^0.8.7",
     "@tailwindcss/vite": "^4.3.3",
     "better-sqlite3": "^13.0.2",
+    "exceljs": "^4.4.0",
     "jszip": "^3.10.1",
     "tailwindcss": "^4.3.3"
   },

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Teacher } from '../../shared/domain'
+import type { AppUpdateStatus } from '../../shared/ipc-types'
 import { Button, Layout, Sidebar, Spinner, Topbar, useToast } from './components/ui'
 import type { SidebarNavItem } from './components/ui'
 import { FirstRunGate } from './pages/FirstRunGate'
@@ -13,6 +14,7 @@ import { GuidePage } from './pages/GuidePage'
 import type { GuideTarget } from './pages/GuidePage'
 import { TeacherFormModal } from './components/common/TeacherFormModal'
 import { EditIcon } from './components/groups/icons'
+import { cn, focusRing } from './components/ui/utils'
 
 type View =
   | { name: 'groups' }
@@ -51,12 +53,21 @@ function App(): React.JSX.Element {
   const [teacher, setTeacher] = useState<Teacher | null | 'loading'>('loading')
   const [view, setView] = useState<View>({ name: 'groups' })
   const [teacherModalOpen, setTeacherModalOpen] = useState(false)
+  const [updateStatus, setUpdateStatus] = useState<AppUpdateStatus | null>(null)
 
   useEffect(() => {
     window.api
       .teacherGet()
       .then(setTeacher)
       .catch(() => setTeacher(null))
+  }, [])
+
+  // Notify-only; main resolves to "no update" on any failure (offline etc.).
+  useEffect(() => {
+    window.api
+      .appGetUpdateStatus()
+      .then(setUpdateStatus)
+      .catch(() => {})
   }, [])
 
   if (teacher === 'loading') {
@@ -187,6 +198,32 @@ function App(): React.JSX.Element {
                 class-doc
               </span>
             </div>
+          }
+          footer={
+            updateStatus && (
+              <div className="flex flex-col items-start gap-1.5 px-4">
+                {updateStatus.update && (
+                  // Amber = DESIGN.md's emphasis color; violet stays reserved
+                  // for each page's single primary action.
+                  <button
+                    type="button"
+                    onClick={() => window.api.appOpenUpdatePage()}
+                    className={cn(
+                      'flex items-center gap-2 rounded-full border border-saffron-spark/40 px-3 py-1.5 text-xs font-medium text-saffron-spark transition-colors duration-150 hover:bg-saffron-spark/10',
+                      focusRing
+                    )}
+                    title="새 버전 다운로드 페이지를 브라우저로 엽니다"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="h-1.5 w-1.5 rounded-full bg-saffron-spark"
+                    />
+                    업데이트 가능 · v{updateStatus.update.version}
+                  </button>
+                )}
+                <p className="text-xs text-ash-gray">v{updateStatus.currentVersion}</p>
+              </div>
+            )
           }
         />
       }

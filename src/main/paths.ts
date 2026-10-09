@@ -27,7 +27,7 @@ function ensureDir(dir: string): string {
   return dir
 }
 
-function getRootDir(): string {
+export function getRootDir(): string {
   return ensureDir(join(resolveBaseDir(), 'class-doc'))
 }
 

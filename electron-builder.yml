@@ -9,6 +9,12 @@ files:
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  # Never package local dev data or repo-only material. class-doc/ in
+  # particular is the dev-mode storage root (src/main/paths.ts) and holds a
+  # real SQLite DB with student data on a developer machine.
+  - '!{class-doc,temp,docs,scripts,img,dist,.claude,.github}/**'
+  - '!*.hwpx'
+  - '!CLAUDE.md'
 asarUnpack:
   - resources/**
   # @rhwp/core is a pure-ESM WASM package loaded via dynamic `import()` from
@@ -43,7 +49,13 @@ linux:
   category: Utility
 appImage:
   artifactName: ${name}-${version}.${ext}
+# better-sqlite3 ships an N-API prebuild that works under Electron as-is (see
+# CLAUDE.md); a from-source rebuild needs MSVC + Windows SDK and isn't needed.
 npmRebuild: false
+# Releases are uploaded by .github/workflows/release.yml (electron-builder
+# itself always runs with --publish never). The app only *notifies* about
+# updates (src/main/updateCheck.ts) — no electron-updater.
 publish:
-  provider: generic
-  url: https://example.com/auto-updates
+  provider: github
+  owner: sinjinwoo
+  repo: class-doc

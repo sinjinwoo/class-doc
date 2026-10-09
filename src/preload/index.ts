@@ -1,6 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-import { GENERATION_PROGRESS_CHANNEL, type Api, type GenerationProgressEvent } from '../shared/ipc-types'
+import {
+  GENERATION_PROGRESS_CHANNEL,
+  type Api,
+  type GenerationProgressEvent
+} from '../shared/ipc-types'
 
 // Thin `ipcRenderer.invoke(...)` wrappers, one per main-process handler
 // registered in src/main/ipc/*.ts. Kept in the same order as
@@ -23,6 +27,7 @@ const api: Api = {
   studentCreateOrUpdate: (payload) => ipcRenderer.invoke('student:createOrUpdate', payload),
   studentDelete: (payload) => ipcRenderer.invoke('student:delete', payload),
   studentImportCsv: (payload) => ipcRenderer.invoke('student:importCsv', payload),
+  studentParseSpreadsheet: (payload) => ipcRenderer.invoke('student:parseSpreadsheet', payload),
 
   templateList: () => ipcRenderer.invoke('template:list'),
   templatePickFile: () => ipcRenderer.invoke('template:pickFile'),
@@ -32,7 +37,8 @@ const api: Api = {
   templateRenderPreview: (payload) => ipcRenderer.invoke('template:renderPreview', payload),
 
   templateFieldList: (payload) => ipcRenderer.invoke('templateField:list', payload),
-  templateFieldUpdateMapping: (payload) => ipcRenderer.invoke('templateField:updateMapping', payload),
+  templateFieldUpdateMapping: (payload) =>
+    ipcRenderer.invoke('templateField:updateMapping', payload),
 
   generationPrepare: (payload) => ipcRenderer.invoke('generation:prepare', payload),
   generationRenderPreviewPage: (payload) =>
@@ -47,7 +53,11 @@ const api: Api = {
     return () => ipcRenderer.removeListener(GENERATION_PROGRESS_CHANNEL, listener)
   },
 
-  studioGetUrl: () => ipcRenderer.invoke('studio:getUrl')
+  studioGetUrl: () => ipcRenderer.invoke('studio:getUrl'),
+
+  appGetUpdateStatus: () => ipcRenderer.invoke('app:getUpdateStatus'),
+  appOpenUpdatePage: () => ipcRenderer.invoke('app:openUpdatePage'),
+  appOpenDataFolder: () => ipcRenderer.invoke('app:openDataFolder')
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

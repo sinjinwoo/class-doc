@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { RhwpEditor } from '@rhwp/editor'
 import type { TemplateDocType } from '../../../shared/domain'
-import { Alert, Button, Input, PageHeader, Select, useToast } from '../components/ui'
+import { Alert, Button, Input, PageHeader, useToast } from '../components/ui'
 import { RhwpEditorHost } from '../editor/RhwpEditorHost'
 
 export interface TemplateEditorPageProps {
@@ -12,11 +12,6 @@ export interface TemplateEditorPageProps {
   onSaved: (templateId: number) => void
   onCancel: () => void
 }
-
-const DOC_TYPE_OPTIONS = [
-  { value: 'INDIVIDUAL', label: '개별형' },
-  { value: 'LIST', label: '목록형' }
-]
 
 function stripExtension(fileName: string): string {
   const dot = fileName.lastIndexOf('.')
@@ -38,6 +33,9 @@ function TemplateEditorPage({
   const [sourceBytes, setSourceBytes] = useState<Uint8Array | null>(null)
   const [sourceFileName, setSourceFileName] = useState('')
   const [name, setName] = useState('')
+  // No doc-type picker in the UI: 목록형 (LIST) generation isn't functional
+  // yet (see generation.ts prepareList()), so new templates are always
+  // 개별형. A re-edited template keeps whatever type it was saved with.
   const [docType, setDocType] = useState<TemplateDocType>('INDIVIDUAL')
   const [loadError, setLoadError] = useState<string | undefined>(undefined)
 
@@ -168,7 +166,7 @@ function TemplateEditorPage({
       <Alert
         type="info"
         message="필드(누름틀)는 편집기 안에서 직접 삽입해 주세요."
-        detail="편집기 위쪽 메뉴의 '입력 → 필드 입력'(Ctrl+K+E)을 사용합니다."
+        detail="편집기 위쪽 메뉴의 '입력 → 필드 입력'을 사용합니다. 단축키는 Ctrl+K를 누른 뒤 E입니다."
       />
 
       {loadError && (
@@ -183,19 +181,21 @@ function TemplateEditorPage({
         />
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Input
-          label="템플릿 이름"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          placeholder={sourceFileName || '템플릿 이름'}
-        />
-        <Select
-          label="문서 유형"
-          value={docType}
-          onChange={(event) => setDocType(event.target.value as TemplateDocType)}
-          options={DOC_TYPE_OPTIONS}
-        />
+      {/* Name + save sit together directly above the editor so the save
+          action is visible without scrolling past the (tall) editor — a
+          bottom action bar went unnoticed in testing. */}
+      <div className="flex items-end gap-3">
+        <div className="flex-1">
+          <Input
+            label="템플릿 이름"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder={sourceFileName || '템플릿 이름'}
+          />
+        </div>
+        <Button variant="primary" onClick={handleSave} loading={saving} disabled={!editorLoaded}>
+          저장
+        </Button>
       </div>
 
       {/* A thin frame around the third-party (white) editor iframe — no
@@ -208,18 +208,6 @@ function TemplateEditorPage({
           overflow-hidden drops a flex item's automatic min-height to 0. */}
       <div className="min-h-[600px] flex-1 overflow-hidden rounded-panel border border-line-strong bg-surface">
         <RhwpEditorHost onReady={handleEditorReady} className="h-full min-h-[600px]" />
-      </div>
-
-      {/* Action bar directly beneath the editor, not sharing a row with the
-          page-level back button/title above — reads as "save what's in the
-          editor above" rather than a generic page-header action. */}
-      <div className="flex items-center justify-end gap-3 border-t border-line pt-4">
-        <p className="mr-auto text-xs text-ash-gray">
-          편집기에서 작업한 내용을 저장합니다. 필드 삽입은 편집기 안의 메뉴를 이용해 주세요.
-        </p>
-        <Button variant="primary" onClick={handleSave} loading={saving} disabled={!editorLoaded}>
-          저장
-        </Button>
       </div>
     </div>
   )

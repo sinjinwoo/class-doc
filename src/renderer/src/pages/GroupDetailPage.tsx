@@ -131,7 +131,7 @@ function GroupDetailPage({ groupId, groupName, onBack }: GroupDetailPageProps): 
     } catch (e) {
       toast({
         type: 'error',
-        message: 'CSV 가져오기에 실패했습니다.',
+        message: '명단 가져오기에 실패했습니다.',
         detail: e instanceof Error ? e.message : String(e)
       })
     }
@@ -156,7 +156,7 @@ function GroupDetailPage({ groupId, groupName, onBack }: GroupDetailPageProps): 
               필드 관리
             </Button>
             <Button variant="secondary" onClick={() => setCsvModalOpen(true)}>
-              CSV 가져오기
+              명단 가져오기
             </Button>
             <Button onClick={handleAddStudentClick}>학생 추가</Button>
           </>
@@ -177,14 +177,14 @@ function GroupDetailPage({ groupId, groupName, onBack }: GroupDetailPageProps): 
       ) : fields.length === 0 ? (
         <EmptyState
           title="아직 등록된 학생 필드가 없습니다"
-          description="CSV 파일을 가져오거나 학생을 한 명 추가하면, 이름/학년/반 같은 필드가 자동으로 설정됩니다. '필드 관리'에서 직접 필드를 추가할 수도 있습니다."
+          description="엑셀·CSV 명단을 가져오거나 학생을 한 명 추가하면, 이름/학년/반 같은 필드가 자동으로 설정됩니다. '필드 관리'에서 직접 필드를 추가할 수도 있습니다."
           action={
             <div className="flex gap-2">
               <Button variant="secondary" onClick={() => setFieldManageModalOpen(true)}>
                 필드 관리
               </Button>
               <Button variant="secondary" onClick={() => setCsvModalOpen(true)}>
-                CSV 가져오기
+                명단 가져오기
               </Button>
               <Button variant="secondary" onClick={handleAddStudentClick}>
                 학생 추가

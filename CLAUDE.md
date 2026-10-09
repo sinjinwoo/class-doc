@@ -149,7 +149,12 @@ exceed Windows' 260-char limit), fills its `pkg/` from
 needed — the npm package *is* that same `--target web` build), builds with
 rhwp-studio's own self-hosting switches (`RHWP_WITHOUT_HWPCTRL=1`,
 `RHWP_DISABLE_EXTERNAL_WEBFONTS=1` — zero external requests, verified), and
-strips the PWA service worker. Output goes to `resources/rhwp-studio/`
+strips the PWA service worker. It also patches one upstream bug before
+building: the 필드 입력 menu advertises Ctrl+K,E but rhwp-studio's Ctrl+K
+chord table (`chordMapK` in `src/engine/input-handler-keyboard.ts`) has no
+`e` entry, so the script adds `e`/`ㄷ` → `insert:field` (and fails the build if
+that code moves). Bump `BUILD_REVISION` in the script whenever its patches
+or post-processing change, so already-built outputs get rebuilt. Output goes to `resources/rhwp-studio/`
 (gitignored — GitHub Actions builds it; never commit it). Keep `@rhwp/core`
 and `@rhwp/editor` on the same version: the studio tag follows `@rhwp/core`.
 
@@ -201,6 +206,28 @@ folder on first access.
 - `class-doc/output/` — generated per-student/per-batch HWPX output from
   `generation:run`. Kept as a sibling of `template/`, not inside it, so
   generated documents never get mistaken for registered templates.
+- **Installed (NSIS) builds keep data inside the install dir**
+  (`%LOCALAPPDATA%\Programs\class-doc\class-doc\`). electron-builder's
+  default uninstaller — which an update also runs, for the *old* version —
+  deletes `$INSTDIR` recursively, which would wipe all teacher data.
+  `build/installer.nsh` overrides `customRemoveFiles` to delete everything
+  except the `class-doc` folder (verified: install → update → uninstall keeps
+  the DB). Don't remove that file. `electron-builder.yml`'s `files` also
+  excludes the dev `class-doc/` folder (real student data on a dev machine),
+  `temp/`, `docs/`, etc. from the package.
+
+## Updates & releases
+
+- Update check is **notify-only** (`src/main/updateCheck.ts`): one
+  unauthenticated GET of this repo's latest GitHub Release, compared against
+  `app.getVersion()`; the sidebar shows "업데이트 가능" and opens the release
+  page. No electron-updater, no download. It's the app's only external
+  request — the guide's 개인정보 안내 text promises exactly that, so keep the
+  two in sync if networking changes.
+- `.github/workflows/release.yml` runs on `v*` tag push (windows-latest):
+  verifies the tag equals `v` + package.json version, `npm ci
+  --ignore-scripts`, `npm run build`, `electron-builder --win --publish
+  never`, then uploads `dist/class-doc-*-setup.exe` to the GitHub Release.
 
 ## Environment gotchas (this machine)
 

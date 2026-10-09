@@ -30,9 +30,13 @@ const stampFile = join(outDir, '.rhwp-studio-version')
 const force = process.argv.includes('--force')
 
 const version = JSON.parse(readFileSync(join(coreDir, 'package.json'), 'utf-8')).version
+// Bump when this script's own patches/post-processing change, so existing
+// outputs of the same studio version get rebuilt instead of skipped.
+const BUILD_REVISION = 2
+const stamp = `${version}+r${BUILD_REVISION}`
 
-if (!force && existsSync(stampFile) && readFileSync(stampFile, 'utf-8').trim() === version) {
-  console.log(`[rhwp-studio] v${version} already built — skipping (use --force to rebuild)`)
+if (!force && existsSync(stampFile) && readFileSync(stampFile, 'utf-8').trim() === stamp) {
+  console.log(`[rhwp-studio] v${stamp} already built — skipping (use --force to rebuild)`)
   process.exit(0)
 }
 
@@ -43,10 +47,20 @@ function run(cmd, args, cwd, env = {}) {
   // npm is a .cmd shim on Windows and can't be spawned without a shell; the
   // shell form takes one command string (args here never contain spaces).
   const useShell = process.platform === 'win32' && cmd === 'npm'
+  const baseEnv = { ...process.env }
+  if (cmd === 'npm') {
+    // When this script itself runs under `npm run`, the parent npm exports
+    // this project's config as npm_config_* env vars (incl. its allowScripts
+    // list), which a nested `npm ci` in rhwp-studio rejects with
+    // EALLOWSCRIPTS. Give the nested npm a clean npm environment.
+    for (const key of Object.keys(baseEnv)) {
+      if (/^npm_/i.test(key)) delete baseEnv[key]
+    }
+  }
   const result = spawnSync(useShell ? [cmd, ...args].join(' ') : cmd, useShell ? [] : args, {
     cwd,
     stdio: 'inherit',
-    env: { ...process.env, ...env },
+    env: { ...baseEnv, ...env },
     shell: useShell
   })
   if (result.status !== 0) {
@@ -88,6 +102,28 @@ if (!existsSync(join(studioDir, 'package.json'))) {
   )
 }
 
+// Upstream bug (v0.8.7): the 필드 입력 menu advertises Ctrl+K+E
+// (command 'insert:field'), but the Ctrl+K chord table only maps h/b/n, so the
+// shortcut does nothing. Add 'e' (and 'ㄷ', the same key under the Korean IME,
+// matching upstream's own pattern for the other entries). Idempotent — the
+// work dir is reused across builds — and fails loudly if upstream changes the
+// code so this patch stops applying, rather than silently shipping without it.
+const keyboardFile = join(studioDir, 'src', 'engine', 'input-handler-keyboard.ts')
+const keyboardSrc = readFileSync(keyboardFile, 'utf-8')
+if (!keyboardSrc.includes("e: 'insert:field'")) {
+  const anchor = 'const chordMapK: Record<string, string> = {'
+  if (!keyboardSrc.includes(anchor)) {
+    throw new Error(`[rhwp-studio] Ctrl+K,E patch anchor not found in ${keyboardFile}`)
+  }
+  writeFileSync(
+    keyboardFile,
+    keyboardSrc.replace(
+      anchor,
+      `${anchor}\n  e: 'insert:field', // class-doc patch: menu shows Ctrl+K+E but it was unmapped\n  ㄷ: 'insert:field', // 한글 IME 상태`
+    )
+  )
+}
+
 const pkgDir = join(repoDir, 'pkg')
 mkdirSync(pkgDir, { recursive: true })
 for (const file of ['rhwp.js', 'rhwp.d.ts', 'rhwp_bg.wasm', 'rhwp_bg.wasm.d.ts']) {
@@ -95,7 +131,12 @@ for (const file of ['rhwp.js', 'rhwp.d.ts', 'rhwp_bg.wasm', 'rhwp_bg.wasm.d.ts']
 }
 cpSync(join(repoDir, 'assets', 'logo', 'favicon.ico'), join(studioDir, 'public', 'favicon.ico'))
 
-run('npm', ['ci', '--no-audit', '--no-fund'], studioDir)
+// The work dir is per studio version and its package-lock never changes, so
+// install once. (Re-running `npm ci` on Windows also fails intermittently
+// when it can't delete the previous node_modules due to file locks.)
+if (!existsSync(join(studioDir, 'node_modules', '.package-lock.json'))) {
+  run('npm', ['ci', '--no-audit', '--no-fund'], studioDir)
+}
 
 const distDir = join(studioDir, 'dist')
 rmSync(distDir, { recursive: true, force: true })
@@ -142,5 +183,5 @@ writeFileSync(indexPath, html)
 
 rmSync(outDir, { recursive: true, force: true })
 cpSync(distDir, outDir, { recursive: true })
-writeFileSync(stampFile, version + '\n')
-console.log(`[rhwp-studio] v${version} built into ${outDir}`)
+writeFileSync(stampFile, stamp + '\n')
+console.log(`[rhwp-studio] v${stamp} built into ${outDir}`)
