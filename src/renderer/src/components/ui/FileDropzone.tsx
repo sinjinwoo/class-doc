@@ -1,6 +1,6 @@
 import type { ChangeEvent, DragEvent, KeyboardEvent } from 'react'
 import { useCallback, useId, useRef, useState } from 'react'
-import { cn } from './utils'
+import { cn, focusRing } from './utils'
 import { Spinner } from './Spinner'
 
 export interface FileDropzoneProps {
@@ -76,10 +76,10 @@ function FileDropzone({
   }
 
   const stateClasses = hasError
-    ? 'border-almond-silk-500 bg-almond-silk-900 text-almond-silk-200'
+    ? 'border-danger bg-danger-surface text-danger'
     : isDragOver
-      ? 'border-space-indigo-400 bg-space-indigo-900 text-space-indigo-200'
-      : 'border-lilac-ash-600 bg-lilac-ash-900 text-lilac-ash-300'
+      ? 'border-electric-iris bg-iris-surface text-iris-light'
+      : 'border-line-strong bg-surface text-silver-mist hover:border-white/30'
 
   return (
     <div
@@ -92,8 +92,8 @@ function FileDropzone({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       className={cn(
-        'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-10 text-center transition-colors duration-150',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-space-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-lilac-ash-900',
+        'flex cursor-pointer flex-col items-center justify-center gap-2 rounded-card border border-dashed p-10 text-center transition-colors duration-150',
+        focusRing,
         stateClasses,
         uploading && 'cursor-not-allowed',
         className
@@ -112,9 +112,9 @@ function FileDropzone({
           <Spinner size="md" />
           {fileName && <p className="text-sm">{fileName}</p>}
           {typeof progress === 'number' && (
-            <div className="h-2 w-full max-w-xs rounded-full bg-lilac-ash-800">
+            <div className="h-1.5 w-full max-w-xs rounded-full bg-white/10">
               <div
-                className="h-2 rounded-full bg-space-indigo-500 transition-all duration-150"
+                className="h-1.5 rounded-full bg-electric-iris transition-all duration-150"
                 style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
               />
             </div>
@@ -127,7 +127,7 @@ function FileDropzone({
       ) : (
         <p className="text-sm">{label}</p>
       )}
-      {hint && !uploading && !hasError && <p className="text-xs text-lilac-ash-400">{hint}</p>}
+      {hint && !uploading && !hasError && <p className="text-xs text-ash-gray">{hint}</p>}
     </div>
   )
 }

@@ -1,61 +1,85 @@
+/*
+ * Design tokens — adapted from docs/DESIGN.md ("Dala": black void canvas,
+ * white type, one violet accent for primary actions, amber for emphasis,
+ * flat surfaces with no shadows/gradients, 24px radii).
+ *
+ * The DESIGN.md palette is reproduced verbatim (void / bone-white /
+ * ash-gray / silver-mist / electric-iris / saffron-spark / deep-verdant).
+ * Everything under "app extensions" is NOT in DESIGN.md — a dense desktop
+ * work tool needs a few things a landing page doesn't (near-black panels,
+ * low-contrast hairlines, inputs, status colors), so those are derived from
+ * the same palette while staying flat and restrained.
+ */
 @theme {
-  --color-space-indigo-50: #efeff6;
-  --color-space-indigo-100: #dfdfec;
-  --color-space-indigo-200: #bebeda;
-  --color-space-indigo-300: #9e9ec7;
-  --color-space-indigo-400: #7d7db5;
-  --color-space-indigo-500: #5d5da2;
-  --color-space-indigo-600: #4a4a82;
-  --color-space-indigo-700: #383861;
-  --color-space-indigo-800: #252541;
-  --color-space-indigo-900: #131320;
-  --color-space-indigo-950: #0d0d17;
+  /* ── DESIGN.md palette ─────────────────────────────────────────────── */
+  --color-void: #000000;
+  --color-bone-white: #ffffff;
+  --color-ash-gray: #9a9a9a;
+  --color-silver-mist: #bdbdbd;
+  --color-electric-iris: #8052ff;
+  --color-saffron-spark: #ffb829;
+  --color-deep-verdant: #15846e;
 
-  --color-dusty-grape-50: #f0f1f4;
-  --color-dusty-grape-100: #e1e2ea;
-  --color-dusty-grape-200: #c3c6d5;
-  --color-dusty-grape-300: #a5a9c0;
-  --color-dusty-grape-400: #888caa;
-  --color-dusty-grape-500: #6a7095;
-  --color-dusty-grape-600: #555977;
-  --color-dusty-grape-700: #3f435a;
-  --color-dusty-grape-800: #2a2d3c;
-  --color-dusty-grape-900: #15161e;
-  --color-dusty-grape-950: #0f1015;
+  /* ── App extensions ────────────────────────────────────────────────── */
+  /* Near-black surfaces: just enough lift to separate panels/tables/
+     modals from the void without reading as "cards with shadows". */
+  --color-surface: #0a0a0a;
+  --color-surface-raised: #111111;
+  --color-surface-hover: #1a1a1a;
 
-  --color-lilac-ash-50: #f3f1f3;
-  --color-lilac-ash-100: #e7e4e7;
-  --color-lilac-ash-200: #cfc9ce;
-  --color-lilac-ash-300: #b7aeb6;
-  --color-lilac-ash-400: #9f939d;
-  --color-lilac-ash-500: #877885;
-  --color-lilac-ash-600: #6c606a;
-  --color-lilac-ash-700: #514850;
-  --color-lilac-ash-800: #363035;
-  --color-lilac-ash-900: #1b181b;
-  --color-lilac-ash-950: #131113;
+  /* Hairlines (DESIGN.md uses none; a data-heavy UI needs a few). */
+  --color-line: rgb(255 255 255 / 0.08);
+  --color-line-strong: rgb(255 255 255 / 0.16);
 
-  --color-almond-silk-50: #f5f0ef;
-  --color-almond-silk-100: #ece2df;
-  --color-almond-silk-200: #d8c4c0;
-  --color-almond-silk-300: #c5a7a0;
-  --color-almond-silk-400: #b18981;
-  --color-almond-silk-500: #9e6c61;
-  --color-almond-silk-600: #7e564e;
-  --color-almond-silk-700: #5f413a;
-  --color-almond-silk-800: #3f2b27;
-  --color-almond-silk-900: #201613;
-  --color-almond-silk-950: #160f0e;
+  /* Lowest-emphasis text (placeholders, disabled). #7a7a7a on #0a0a0a ≈ 4.3:1. */
+  --color-dim: #7a7a7a;
 
-  --color-parchment-50: #f7f1ee;
-  --color-parchment-100: #eee3dd;
-  --color-parchment-200: #dec7ba;
-  --color-parchment-300: #cdaa98;
-  --color-parchment-400: #bd8e75;
-  --color-parchment-500: #ac7253;
-  --color-parchment-600: #8a5b42;
-  --color-parchment-700: #674432;
-  --color-parchment-800: #452e21;
-  --color-parchment-900: #221711;
-  --color-parchment-950: #18100c;
+  /* Electric Iris interaction states + an opaque tint for small selected/
+     filled areas (opaque so it also works on overlays like toasts). */
+  --color-iris-hover: #9470ff;
+  --color-iris-active: #6b3cf0;
+  --color-iris-light: #cbbcff;
+  --color-iris-surface: #140d2a;
+
+  /* Status colors — text-on-black legible tones + opaque tinted surfaces.
+     Never used as filled button backgrounds (violet is the only filled
+     button color, per DESIGN.md). */
+  --color-success: #4fd1b0;
+  --color-success-surface: #061a15;
+  --color-warning: #ffb829;
+  --color-warning-surface: #1c1405;
+  --color-danger: #ff7a6b;
+  --color-danger-surface: #1f0c0a;
+
+  /* ── Typography ───────────────────────────────────────────────────── */
+  /* PPNeueMontreal has no Hangul and the app is offline-only (CSP
+     default-src 'self'), so: Inter if installed (DESIGN.md's named
+     substitute), then Pretendard, then Windows' Segoe UI for Latin and
+     Malgun Gothic for Hangul (per-glyph fallback). */
+  --font-sans:
+    'Inter', 'Pretendard', 'Pretendard Variable', 'Segoe UI Variable Text', 'Segoe UI',
+    'Malgun Gothic', '맑은 고딕', 'Apple SD Gothic Neo', system-ui, sans-serif;
+  --font-mono: 'Cascadia Mono', Consolas, 'D2Coding', ui-monospace, monospace;
+
+  /* App-scaled version of DESIGN.md's type scale: no 78–113px display
+     sizes, but the same weight-400 + negative-tracking idea. */
+  --text-display: 2.25rem; /* 36px — guide hero */
+  --text-display--line-height: 1.15;
+  --text-display--letter-spacing: -0.04em;
+  --text-title: 1.75rem; /* 28px — page titles */
+  --text-title--line-height: 1.2;
+  --text-title--letter-spacing: -0.03em;
+  --text-heading: 1.25rem; /* 20px — section / modal titles */
+  --text-heading--line-height: 1.3;
+  --text-heading--letter-spacing: -0.02em;
+  --text-label: 0.75rem; /* 12px — uppercase tracked small labels */
+  --text-label--line-height: 1.3;
+  --text-label--letter-spacing: 0.08em;
+
+  /* ── Radii ────────────────────────────────────────────────────────── */
+  /* DESIGN.md: 24px for nav/cards/buttons, 9999px pills. Inputs and
+     tables use a smaller 12–16px so dense rows don't look bloated. */
+  --radius-card: 24px;
+  --radius-field: 12px;
+  --radius-panel: 16px;
 }

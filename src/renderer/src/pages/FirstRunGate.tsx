@@ -1,7 +1,7 @@
 import type { KeyboardEvent } from 'react'
 import { useState } from 'react'
 import type { Teacher } from '../../../shared/domain'
-import { Alert, Button, Card, Input } from '../components/ui'
+import { Alert, Button, Input } from '../components/ui'
 
 export interface FirstRunGateProps {
   onCreated: (teacher: Teacher) => void
@@ -38,13 +38,24 @@ function FirstRunGate({ onCreated }: FirstRunGateProps): React.JSX.Element {
   }
 
   return (
-    <div className="flex h-screen w-screen items-center justify-center bg-lilac-ash-950 p-6">
-      <Card title="class-doc에 오신 것을 환영합니다" className="w-full max-w-sm">
-        <div className="flex flex-col gap-4">
-          <p className="text-sm text-lilac-ash-300">
+    <div className="flex h-screen w-screen items-center justify-center bg-void p-6">
+      {/* DESIGN.md's "section headline block": amber eyebrow, large weight-400
+          headline, gray supporting copy and one violet pill — floating on the
+          void with no card around it. */}
+      <div className="flex w-full max-w-md flex-col gap-8">
+        <div className="flex flex-col gap-3">
+          <p className="text-label font-medium uppercase text-saffron-spark">class-doc</p>
+          <h1 className="text-display font-normal text-bone-white">
+            반가워요,
+            <br />
+            선생님.
+          </h1>
+          <p className="text-sm text-ash-gray">
             선생님 성함을 입력해 주세요. 이 정보는 이 PC에만 저장되며 별도의 로그인은 필요하지
             않습니다.
           </p>
+        </div>
+        <div className="flex flex-col gap-4">
           <Input
             label="선생님 성함"
             value={name}
@@ -54,11 +65,17 @@ function FirstRunGate({ onCreated }: FirstRunGateProps): React.JSX.Element {
             autoFocus
           />
           {error && <Alert type="error" message="프로필을 만들지 못했습니다." detail={error} />}
-          <Button variant="primary" disabled={!isValid} loading={submitting} onClick={handleSubmit}>
+          <Button
+            variant="primary"
+            className="self-start"
+            disabled={!isValid}
+            loading={submitting}
+            onClick={handleSubmit}
+          >
             시작하기
           </Button>
         </div>
-      </Card>
+      </div>
     </div>
   )
 }

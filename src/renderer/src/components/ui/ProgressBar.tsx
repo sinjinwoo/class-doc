@@ -28,14 +28,14 @@ function ProgressBar({
       {...props}
     >
       {(label || showValue) && (
-        <div className="mb-1 flex items-center justify-between gap-2 text-sm text-lilac-ash-300">
+        <div className="mb-1 flex items-center justify-between gap-2 text-sm text-silver-mist">
           {label && <span>{label}</span>}
           {showValue && <span>{roundedValue}%</span>}
         </div>
       )}
-      <div className="w-full overflow-hidden rounded-full bg-lilac-ash-800 h-2">
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
         <div
-          className="h-2 rounded-full bg-space-indigo-500 transition-all duration-150"
+          className="h-1.5 rounded-full bg-electric-iris transition-all duration-150"
           style={{ width: `${clampedValue}%` }}
         />
       </div>

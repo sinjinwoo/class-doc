@@ -8,13 +8,12 @@ export interface CardProps extends Omit<ComponentPropsWithoutRef<'div'>, 'title'
 
 function Card({ title, action, className, children, ...props }: CardProps): React.JSX.Element {
   return (
-    <div
-      className={cn('rounded-lg border border-lilac-ash-700 bg-lilac-ash-900 p-6', className)}
-      {...props}
-    >
+    <div className={cn('rounded-card border border-line bg-surface p-6', className)} {...props}>
       {(title || action) && (
-        <div className="mb-4 flex items-center justify-between">
-          {title && <h3 className="text-base font-semibold text-lilac-ash-50">{title}</h3>}
+        <div className={cn('flex items-center justify-between gap-3', children != null && 'mb-4')}>
+          {title && (
+            <h3 className="min-w-0 truncate text-heading font-normal text-bone-white">{title}</h3>
+          )}
           {action}
         </div>
       )}

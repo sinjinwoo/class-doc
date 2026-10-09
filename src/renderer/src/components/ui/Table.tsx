@@ -16,7 +16,7 @@ function TableRoot({
 }: TableProps): React.JSX.Element {
   return (
     <TableDenseContext.Provider value={dense}>
-      <div className="w-full overflow-x-auto">
+      <div className="w-full overflow-x-auto rounded-panel border border-line bg-surface">
         {/* `w-full` so the table uses the space its container actually has
             (dropping it entirely made every table shrink-wrap to its content
             and look tiny regardless of screen size — overcorrected). The
@@ -26,7 +26,10 @@ function TableRoot({
             compact while one designated column absorbs any leftover space —
             plus `divide-x` below, so column boundaries read clearly even
             when a column does end up wider than its content strictly needs. */}
-        <table className={cn('w-full border-collapse text-left', className)} {...props}>
+        <table
+          className={cn('w-full border-collapse text-left text-bone-white', className)}
+          {...props}
+        >
           {children}
         </table>
       </div>
@@ -38,7 +41,7 @@ export type TableHeadProps = ComponentPropsWithoutRef<'thead'>
 
 function TableHead({ className, ...props }: TableHeadProps): React.JSX.Element {
   return (
-    <thead className={cn('border-b-2 border-lilac-ash-600 bg-lilac-ash-800', className)} {...props} />
+    <thead className={cn('border-b border-line-strong bg-surface-raised', className)} {...props} />
   )
 }
 
@@ -58,9 +61,14 @@ function TableRow({ selected = false, className, ...props }: TableRowProps): Rea
   return (
     <tr
       className={cn(
-        'border-b border-lilac-ash-800 transition-colors duration-150 last:border-0 hover:bg-lilac-ash-800',
-        dense ? 'h-8' : 'h-11',
-        selected && 'border-l-2 border-l-space-indigo-400 bg-space-indigo-900',
+        'border-b border-line transition-colors duration-150 last:border-0 hover:bg-white/[0.03]',
+        dense ? 'h-9' : 'h-12',
+        // The violet "selected" stripe is an inset line on the first cell, not
+        // a border-left on the <tr>: row borders in a border-collapse table
+        // lose conflict resolution to adjacent cell borders and rendered on
+        // only some rows.
+        selected &&
+          'bg-white/[0.04] [&>td:first-child]:shadow-[inset_2px_0_0_var(--color-electric-iris)]',
         className
       )}
       {...props}
@@ -79,7 +87,7 @@ function TableCell({ className, ...props }: TableCellProps): React.JSX.Element {
         // border-r (not the parent row's divide-x) so header cells can use a
         // different, more visible divider color against their own bg — see
         // TableHeaderCell's identical comment.
-        'break-words border-r border-lilac-ash-800 text-lilac-ash-100 last:border-r-0',
+        'break-words border-r border-line last:border-r-0',
         dense ? 'px-3 py-1.5 text-xs' : 'px-4 py-3 text-sm',
         className
       )}
@@ -100,11 +108,9 @@ function TableHeaderCell({ className, ...props }: TableHeaderCellProps): React.J
         // not just a slightly-different-colored first row — bigger, bolder,
         // brighter text + the thead's own stronger bg/border above do that.
         // border-r uses a *lighter* divider than TableCell's, since the
-        // header's own bg (lilac-ash-800) is already darker than the body's
-        // — reusing the same divider color the body cells use would render
-        // invisible against this bg (that's exactly what happened when both
-        // used the same `divide-x` on the shared row instead).
-        'break-words border-r border-lilac-ash-600 text-sm font-semibold uppercase tracking-wide text-lilac-ash-100 last:border-r-0',
+        // header's own raised bg differs from the body's — reusing the same
+        // divider color the body cells use would read too faint against it.
+        'break-words border-r border-line-strong text-[13px] font-semibold uppercase tracking-wide text-silver-mist last:border-r-0',
         dense ? 'px-3 py-2.5' : 'px-4 py-4',
         className
       )}

@@ -99,7 +99,7 @@ function StudentValueTable({
                     key={templateField.id}
                     className={cn(
                       'text-center',
-                      teacherName && 'bg-space-indigo-950/40 font-medium text-space-indigo-100'
+                      teacherName && 'bg-iris-surface font-medium text-iris-light'
                     )}
                   >
                     {teacherName}
@@ -118,7 +118,7 @@ function StudentValueTable({
                   key={templateField.id}
                   className={cn(
                     'text-center',
-                    value && 'bg-space-indigo-950/40 font-medium text-space-indigo-100'
+                    value && 'bg-iris-surface font-medium text-iris-light'
                   )}
                 >
                   {value}

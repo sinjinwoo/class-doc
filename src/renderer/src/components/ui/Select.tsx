@@ -36,10 +36,7 @@ function Select({
   return (
     <div className="flex flex-col gap-1.5">
       {label && (
-        <label
-          htmlFor={selectId}
-          className="text-xs font-medium uppercase tracking-wide text-lilac-ash-300"
-        >
+        <label htmlFor={selectId} className="text-label font-medium uppercase text-ash-gray">
           {label}
         </label>
       )}
@@ -51,11 +48,16 @@ function Select({
           disabled={disabled}
           aria-disabled={disabled || undefined}
           className={cn(
-            'h-10 w-full appearance-none rounded-md border bg-lilac-ash-900 px-3 py-2 pr-8 text-sm text-lilac-ash-50 transition-colors duration-150',
-            'focus-visible:outline-none focus-visible:border-space-indigo-400 focus-visible:ring-1 focus-visible:ring-space-indigo-400',
-            hasError ? 'border-almond-silk-500' : 'border-lilac-ash-700',
-            disabled &&
-              'cursor-not-allowed border-lilac-ash-800 bg-lilac-ash-950 text-lilac-ash-500',
+            'h-10 w-full cursor-pointer appearance-none rounded-field border px-3.5 py-2 pr-9 text-sm transition-colors duration-150',
+            'focus-visible:outline-none focus-visible:border-electric-iris focus-visible:ring-2 focus-visible:ring-electric-iris/40',
+            // Exclusive states (not base + override): conflicting color utilities
+            // on one element resolve by stylesheet order, not class order.
+            disabled
+              ? 'cursor-not-allowed border-line bg-void text-dim'
+              : cn(
+                  'bg-surface text-bone-white',
+                  hasError ? 'border-danger' : 'border-line-strong hover:border-white/25'
+                ),
             className
           )}
           {...props}
@@ -68,13 +70,10 @@ function Select({
               ))
             : children}
         </select>
-        <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-lilac-ash-400" />
+        <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ash-gray" />
       </div>
       {helper && (
-        <p
-          id={helperId}
-          className={cn('mt-1 text-xs', hasError ? 'text-almond-silk-300' : 'text-lilac-ash-300')}
-        >
+        <p id={helperId} className={cn('text-xs', hasError ? 'text-danger' : 'text-ash-gray')}>
           {helper}
         </p>
       )}

@@ -11,16 +11,20 @@ function Topbar({ title, children, className }: TopbarProps): React.JSX.Element 
   return (
     <header
       className={cn(
-        'flex h-16 shrink-0 items-center justify-between border-b border-lilac-ash-700 bg-lilac-ash-900 px-6',
+        'flex h-14 shrink-0 items-center justify-between border-b border-line bg-void px-8',
         className
       )}
     >
       {typeof title === 'string' ? (
-        <h1 className="text-xl font-semibold text-lilac-ash-50">{title}</h1>
+        // Small uppercase/tracked nav-style label (DESIGN.md "nav-label"), not
+        // a big heading — each page renders its own large title below.
+        <h1 className="text-label font-medium uppercase text-ash-gray">{title}</h1>
       ) : (
         title
       )}
-      {children && <div className="flex items-center gap-2">{children}</div>}
+      {children && (
+        <div className="flex items-center gap-2 text-sm text-silver-mist">{children}</div>
+      )}
     </header>
   )
 }

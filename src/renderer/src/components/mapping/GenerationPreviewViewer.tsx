@@ -67,7 +67,7 @@ function GenerationPreviewViewer({
             visible. max-w/max-h-full + w/h-auto on the injected <svg> is the
             same "shrink to fit, keep aspect ratio" rule normally used for
             <img>. */}
-        <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-md border border-lilac-ash-800 bg-lilac-ash-700 p-3">
+        <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-panel border border-line bg-surface-hover p-4">
           {loading ? (
             <Spinner size="lg" />
           ) : svg ? (
@@ -78,7 +78,7 @@ function GenerationPreviewViewer({
               dangerouslySetInnerHTML={{ __html: svg }}
             />
           ) : (
-            <div className="text-sm text-lilac-ash-400">렌더링된 페이지가 없습니다.</div>
+            <div className="text-sm text-ash-gray">렌더링된 페이지가 없습니다.</div>
           )}
         </div>
       </Card>

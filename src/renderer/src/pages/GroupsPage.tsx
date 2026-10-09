@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { StudentGroup } from '../../../shared/domain'
-import { Alert, Button, EmptyState, Spinner, useToast } from '../components/ui'
+import { Alert, Button, EmptyState, PageHeader, Spinner, useToast } from '../components/ui'
 import { GroupCard } from '../components/groups/GroupCard'
 import { GroupFormModal } from '../components/groups/GroupFormModal'
 import { ConfirmDialog } from '../components/common/ConfirmDialog'
@@ -104,11 +104,13 @@ function GroupsPage({ teacherId, onOpenGroup }: GroupsPageProps): React.JSX.Elem
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-lilac-ash-50">그룹 관리</h2>
-        <Button onClick={handleCreateClick}>새 그룹</Button>
-      </div>
+    <div className="flex flex-col gap-8">
+      <PageHeader
+        eyebrow="학생 명단"
+        title="그룹 관리"
+        description="반, 동아리처럼 함께 문서를 만들 학생들을 그룹으로 묶어 관리합니다. 그룹을 누르면 학생 명단을 볼 수 있습니다."
+        actions={<Button onClick={handleCreateClick}>새 그룹</Button>}
+      />
 
       {loading ? (
         <div className="flex justify-center py-10">
@@ -125,7 +127,11 @@ function GroupsPage({ teacherId, onOpenGroup }: GroupsPageProps): React.JSX.Elem
         <EmptyState
           title="아직 그룹이 없습니다"
           description="학생 명단을 관리할 첫 그룹을 만들어 보세요."
-          action={<Button onClick={handleCreateClick}>새 그룹 만들기</Button>}
+          action={
+            <Button variant="secondary" onClick={handleCreateClick}>
+              새 그룹 만들기
+            </Button>
+          }
         />
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

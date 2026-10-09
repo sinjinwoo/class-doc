@@ -1,6 +1,6 @@
 import type { ComponentPropsWithoutRef, ReactNode } from 'react'
 import { useId } from 'react'
-import { cn } from './utils'
+import { cn, focusRing } from './utils'
 
 export interface CheckboxProps extends ComponentPropsWithoutRef<'input'> {
   children?: ReactNode
@@ -20,7 +20,7 @@ function Checkbox({
     <label
       htmlFor={checkboxId}
       className={cn(
-        'flex items-center gap-2 text-sm text-lilac-ash-100',
+        'flex items-center gap-2 text-sm text-bone-white',
         disabled && 'cursor-not-allowed opacity-50'
       )}
     >
@@ -30,8 +30,8 @@ function Checkbox({
         disabled={disabled}
         aria-disabled={disabled || undefined}
         className={cn(
-          'h-4 w-4 rounded border border-lilac-ash-600 bg-lilac-ash-900 accent-space-indigo-500 transition-colors duration-150',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-space-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-lilac-ash-900',
+          'h-4 w-4 cursor-pointer rounded accent-electric-iris transition-colors duration-150',
+          focusRing,
           disabled && 'cursor-not-allowed',
           className
         )}

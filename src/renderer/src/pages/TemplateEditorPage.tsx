@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { RhwpEditor } from '@rhwp/editor'
 import type { TemplateDocType } from '../../../shared/domain'
-import { Alert, Button, Card, Input, Select, useToast } from '../components/ui'
+import { Alert, Button, Input, PageHeader, Select, useToast } from '../components/ui'
 import { RhwpEditorHost } from '../editor/RhwpEditorHost'
 
 export interface TemplateEditorPageProps {
@@ -154,20 +154,21 @@ function TemplateEditorPage({
   }
 
   return (
-    <div className="flex h-full flex-col gap-4">
-      <div className="flex items-center gap-3">
-        <Button variant="secondary" onClick={onCancel}>
-          ← 템플릿 목록
-        </Button>
-        <h2 className="text-lg font-semibold text-lilac-ash-50">
-          {templateId !== undefined ? '템플릿 편집' : '새 템플릿 등록'}
-        </h2>
-      </div>
+    <div className="flex h-full flex-col gap-6">
+      <PageHeader
+        leading={
+          <Button variant="ghost" className="-ml-3" onClick={onCancel}>
+            ← 템플릿 목록
+          </Button>
+        }
+        eyebrow="템플릿"
+        title={templateId !== undefined ? '템플릿 편집' : '새 템플릿 등록'}
+      />
 
       <Alert
         type="info"
         message="필드(누름틀)는 편집기 안에서 직접 삽입해 주세요."
-        detail="'도구 상자 → 입력 → 필드 입력'(Ctrl+K+E) 메뉴를 사용합니다."
+        detail="편집기 위쪽 메뉴의 '입력 → 필드 입력'(Ctrl+K+E)을 사용합니다."
       />
 
       {loadError && (
@@ -197,19 +198,23 @@ function TemplateEditorPage({
         />
       </div>
 
-      <Card className="flex-1">
-        {/* Fills whatever vertical space this flex-1 Card is given instead of a
-            fixed height, so the editor doesn't get clipped (nor waste space)
-            when the window is resized smaller/larger than the original design
-            size — the app window has no fixed-size lock (src/main/index.ts). */}
+      {/* A thin frame around the third-party (white) editor iframe — no
+          padding, so the editor's own chrome sits flush inside the rounded
+          hairline instead of floating in a dark box. Fills whatever vertical
+          space this flex-1 wrapper is given instead of a fixed height, so the
+          editor doesn't get clipped (nor waste space) when the window is
+          resized — the app window has no fixed-size lock (src/main/index.ts).
+          The min-h lives on this wrapper (not just the host) because
+          overflow-hidden drops a flex item's automatic min-height to 0. */}
+      <div className="min-h-[600px] flex-1 overflow-hidden rounded-panel border border-line-strong bg-surface">
         <RhwpEditorHost onReady={handleEditorReady} className="h-full min-h-[600px]" />
-      </Card>
+      </div>
 
       {/* Action bar directly beneath the editor, not sharing a row with the
           page-level back button/title above — reads as "save what's in the
           editor above" rather than a generic page-header action. */}
-      <div className="flex items-center justify-end gap-3 border-t border-lilac-ash-700 pt-4">
-        <p className="mr-auto text-xs text-lilac-ash-400">
+      <div className="flex items-center justify-end gap-3 border-t border-line pt-4">
+        <p className="mr-auto text-xs text-ash-gray">
           편집기에서 작업한 내용을 저장합니다. 필드 삽입은 편집기 안의 메뉴를 이용해 주세요.
         </p>
         <Button variant="primary" onClick={handleSave} loading={saving} disabled={!editorLoaded}>
