@@ -14,6 +14,7 @@ import { spawnSync } from 'node:child_process'
 import {
   cpSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   readFileSync,
   readdirSync,
@@ -32,7 +33,7 @@ const force = process.argv.includes('--force')
 const version = JSON.parse(readFileSync(join(coreDir, 'package.json'), 'utf-8')).version
 // Bump when this script's own patches/post-processing change, so existing
 // outputs of the same studio version get rebuilt instead of skipped.
-const BUILD_REVISION = 2
+const BUILD_REVISION = 3
 const stamp = `${version}+r${BUILD_REVISION}`
 
 if (!force && existsSync(stampFile) && readFileSync(stampFile, 'utf-8').trim() === stamp) {
@@ -76,8 +77,7 @@ if (!existsSync(join(studioDir, 'package.json'))) {
   rmSync(workDir, { recursive: true, force: true })
   mkdirSync(workDir, { recursive: true })
   // Sparse + blobless: the full repo is ~42k files, some with paths beyond
-  // Windows' 260-char limit (hence core.longpaths). Only rhwp-studio/ and
-  // the favicon are needed.
+  // Windows' 260-char limit (hence core.longpaths).
   run(
     'git',
     [
@@ -95,11 +95,35 @@ if (!existsSync(join(studioDir, 'package.json'))) {
     ],
     workDir
   )
-  run(
-    'git',
-    ['-c', 'core.longpaths=true', 'sparse-checkout', 'set', 'rhwp-studio', 'assets/logo'],
-    repoDir
-  )
+}
+// Only rhwp-studio/, the favicon and the bundled Korean fallback fonts are
+// needed. Run on every build (idempotent) so a work dir cloned by an older
+// version of this script picks up newly needed paths.
+run(
+  'git',
+  [
+    '-c',
+    'core.longpaths=true',
+    'sparse-checkout',
+    'set',
+    'rhwp-studio',
+    'assets/logo',
+    'assets/fonts'
+  ],
+  repoDir
+)
+
+// rhwp-studio/public/fonts is a git symlink to ../../assets/fonts (the
+// offline Korean fallback web fonts studio serves from /fonts/). Where git
+// checks out real symlinks (CI) it needs assets/fonts present (above); where
+// it doesn't (Windows default core.symlinks=false) it's a plain text file
+// holding the link path, which silently shipped no fonts. Replace that file
+// with a real copy so both environments produce the same output.
+const publicFonts = join(studioDir, 'public', 'fonts')
+const publicFontsStat = lstatSync(publicFonts)
+if (!publicFontsStat.isDirectory() && !publicFontsStat.isSymbolicLink()) {
+  rmSync(publicFonts, { force: true })
+  cpSync(join(repoDir, 'assets', 'fonts'), publicFonts, { recursive: true })
 }
 
 // Upstream bug (v0.8.7): the 필드 입력 menu advertises Ctrl+K+E
