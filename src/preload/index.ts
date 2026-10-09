@@ -45,7 +45,9 @@ const api: Api = {
       callback(progress)
     ipcRenderer.on(GENERATION_PROGRESS_CHANNEL, listener)
     return () => ipcRenderer.removeListener(GENERATION_PROGRESS_CHANNEL, listener)
-  }
+  },
+
+  studioGetUrl: () => ipcRenderer.invoke('studio:getUrl')
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

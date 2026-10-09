@@ -12,11 +12,12 @@ features like class/roster generation.
 
 ```
 npm install         # install deps (postinstall runs electron-builder install-app-deps)
-npm run dev          # launch the app (electron-vite dev, HMR renderer)
+npm run dev          # studio:build (if needed) + electron-vite dev, HMR renderer
+npm run studio:build # build self-hosted rhwp-studio into resources/rhwp-studio/ (skips if up to date; --force to rebuild)
 npm run typecheck    # tsc --noEmit for both main/preload (node) and renderer (web) configs
 npm run lint         # eslint --cache .
 npm run format       # prettier --write .
-npm run build        # typecheck + electron-vite build (main/preload/renderer, out/)
+npm run build        # typecheck + studio:build + electron-vite build (main/preload/renderer, out/)
 npm run build:win    # build + electron-builder --win (NSIS)
 ```
 
@@ -137,21 +138,31 @@ verified constraints from actually testing these packages, including:
 own internal "필드 입력" UI menu can do that — a human always inserts
 fields, never the host app).
 
-**`@rhwp/editor`'s template-editing screen requires an internet
-connection.** `createEditor()` mounts an iframe whose `src` defaults to
-`https://edwardkim.github.io/rhwp/` (verified in
-`node_modules/@rhwp/editor/index.js`) — the npm package only ships the
-`postMessage` transport wrapper, not the editor UI itself, and the SDK
-rejects non-HTTP(S) origins outright (`file:`/`data:` are explicitly
-unsupported), so bundling it for a fully offline `file://` load is not
-possible without a separate effort. This app deliberately ships with the
-default hosted URL (decided explicitly, not a fallback) — the template
-editor screen shows this as a known limitation rather than a silent
-failure. Self-hosting `rhwp-studio` (building that separate repo, vendoring
-its `dist/` output, and running a local `127.0.0.1` static server from
-Electron main) would remove this dependency but is out of scope for now —
-see `src/renderer/src/editor/studioUrl.ts` for where that decision is
-pinned if it needs to change later.
+**`rhwp-studio` (the `@rhwp/editor` iframe UI) is self-hosted — the
+template editor works offline.** The `@rhwp/editor` npm package only ships
+the `postMessage` transport wrapper; the UI itself is `rhwp-studio` from the
+`edwardkim/rhwp` repo. `scripts/build-rhwp-studio.mjs` (`npm run
+studio:build`, run automatically by `dev`/`build`) clones that repo at tag
+`v<installed @rhwp/core version>` (sparse, `core.longpaths` — some paths
+exceed Windows' 260-char limit), fills its `pkg/` from
+`node_modules/@rhwp/core` instead of running `wasm-pack` (no Rust toolchain
+needed — the npm package *is* that same `--target web` build), builds with
+rhwp-studio's own self-hosting switches (`RHWP_WITHOUT_HWPCTRL=1`,
+`RHWP_DISABLE_EXTERNAL_WEBFONTS=1` — zero external requests, verified), and
+strips the PWA service worker. Output goes to `resources/rhwp-studio/`
+(gitignored — GitHub Actions builds it; never commit it). Keep `@rhwp/core`
+and `@rhwp/editor` on the same version: the studio tag follows `@rhwp/core`.
+
+Both the studio and the **production renderer** are served from
+`127.0.0.1` by `src/main/localServer.ts` (studio via
+`src/main/rhwp/studioServer.ts` + the `studio:getUrl` IPC, preferred fixed
+port 47811 so studio's own localStorage settings persist; renderer on a
+random port from `index.ts`). The renderer must not use `loadFile()`:
+rhwp-studio's embed runtime ignores any parent whose origin isn't http(s)
+(`isUsableParentOrigin()` in `rhwp-studio/src/embed/protocol.ts`), so a
+`file://` renderer left `createEditor()` silently retrying for ~5 minutes.
+`npm run dev` was never affected (the renderer is `http://localhost` there),
+which is why this only showed up in built output.
 
 `better-sqlite3` is installed. This machine has no MSVC Build Tools (no
 Windows SDK component), so `node-gyp rebuild` fails — but this turned out

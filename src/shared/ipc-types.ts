@@ -233,4 +233,7 @@ export interface Api {
   generationDiscardPreview(payload: GenerationDiscardPreviewRequest): Promise<void>
   generationPickOutputDir(): Promise<string | null>
   onGenerationProgress(callback: (event: GenerationProgressEvent) => void): () => void
+
+  /** Local http://127.0.0.1 URL of the self-hosted rhwp-studio (the editor iframe). */
+  studioGetUrl(): Promise<string>
 }

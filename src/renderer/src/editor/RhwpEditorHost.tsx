@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { createEditor, type RhwpEditor } from '@rhwp/editor'
 import { Alert, Spinner } from '../components/ui'
 import { cn } from '../components/ui/utils'
-import { RHWP_STUDIO_URL } from './studioUrl'
 
 // Waits two animation frames — one full layout+paint cycle — so any
 // still-settling ancestor flex layout (e.g. TemplateEditorPage.tsx's
@@ -22,12 +21,12 @@ export interface RhwpEditorHostProps {
 
 type EditorStatus = 'loading' | 'ready' | 'error'
 
-// Mounts/unmounts the @rhwp/editor iframe lifecycle. This screen depends on
-// reaching the online-hosted rhwp-studio (see studioUrl.ts) — no network, or
-// the host being briefly unreachable, is an expected failure mode here, not
-// an exceptional one, so createEditor()'s rejection is caught and surfaced
-// as an inline Alert rather than left as an unhandled rejection that would
-// blank the screen.
+// Mounts/unmounts the @rhwp/editor iframe lifecycle. The iframe points at the
+// self-hosted rhwp-studio that the main process serves on 127.0.0.1 (see
+// src/main/rhwp/studioServer.ts) — no internet needed. Failures (studio files
+// missing, server or handshake errors) are caught and surfaced as an inline
+// Alert rather than left as an unhandled rejection that would blank the
+// screen.
 function RhwpEditorHost({ onReady, className }: RhwpEditorHostProps): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const editorRef = useRef<RhwpEditor | null>(null)
@@ -67,7 +66,9 @@ function RhwpEditorHost({ onReady, className }: RhwpEditorHostProps): React.JSX.
     // container that has already settled into its real size.
     waitTwoFrames().then(() => {
       if (cancelled) return
-      createEditor(container, { studioUrl: RHWP_STUDIO_URL })
+      window.api
+        .studioGetUrl()
+        .then((studioUrl) => createEditor(container, { studioUrl }))
         .then((editor) => {
           if (cancelled) {
             editor.destroy()
@@ -112,7 +113,7 @@ function RhwpEditorHost({ onReady, className }: RhwpEditorHostProps): React.JSX.
         <div className="absolute inset-0 flex items-center justify-center p-4">
           <Alert
             type="error"
-            message="편집기를 불러오지 못했습니다. 인터넷 연결을 확인한 뒤 이 화면을 다시 열어주세요."
+            message="편집기를 불러오지 못했습니다. 이 화면을 다시 열어주세요."
             detail={errorMessage}
           />
         </div>
