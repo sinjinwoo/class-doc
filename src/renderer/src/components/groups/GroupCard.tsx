@@ -1,6 +1,7 @@
 import type { MouseEvent } from 'react'
 import type { StudentGroup } from '../../../../shared/domain'
 import { Badge, Button, Card } from '../ui'
+import { cn, focusRing } from '../ui/utils'
 import { DeleteIcon } from './icons'
 
 export interface GroupCardProps {
@@ -32,7 +33,10 @@ function GroupCard({ group, studentCount, onOpen, onDelete }: GroupCardProps): R
           onOpen()
         }
       }}
-      className="cursor-pointer transition-colors duration-150 hover:border-space-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-space-indigo-400"
+      className={cn(
+        'cursor-pointer transition-colors duration-150 hover:border-line-strong hover:bg-surface-raised',
+        focusRing
+      )}
       action={
         <div className="flex items-center gap-2">
           <Badge status="neutral">{studentCount}명</Badge>

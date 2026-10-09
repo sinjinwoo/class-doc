@@ -4,6 +4,7 @@ import {
   Alert,
   Button,
   EmptyState,
+  PageHeader,
   Spinner,
   Tab,
   TabList,
@@ -89,13 +90,17 @@ function TemplateLibraryPage({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-lilac-ash-50">템플릿 라이브러리</h2>
-        <Button onClick={handlePickFile} loading={picking}>
-          새 템플릿 등록
-        </Button>
-      </div>
+    <div className="flex flex-col gap-8">
+      <PageHeader
+        eyebrow="문서 서식"
+        title="템플릿 라이브러리"
+        description="누름틀(필드)을 넣은 한글(HWPX) 서식을 등록해 두고, 문서를 만들 때 불러와 사용합니다."
+        actions={
+          <Button onClick={handlePickFile} loading={picking}>
+            새 템플릿 등록
+          </Button>
+        }
+      />
 
       {loading ? (
         <div className="flex justify-center py-10">
@@ -118,13 +123,13 @@ function TemplateLibraryPage({
             <Tab value="preview">미리보기</Tab>
           </TabList>
 
-          <TabPanel value="library" className="pt-4">
+          <TabPanel value="library" className="pt-6">
             {templates.length === 0 ? (
               <EmptyState
                 title="등록된 템플릿이 없습니다"
                 description="HWPX 파일을 선택해 새 템플릿을 등록하세요."
                 action={
-                  <Button onClick={handlePickFile} loading={picking}>
+                  <Button variant="secondary" onClick={handlePickFile} loading={picking}>
                     새 템플릿 등록
                   </Button>
                 }
@@ -143,7 +148,7 @@ function TemplateLibraryPage({
             )}
           </TabPanel>
 
-          <TabPanel value="preview" className="pt-4">
+          <TabPanel value="preview" className="pt-6">
             <TemplatePreviewPanel templates={templates} />
           </TabPanel>
         </Tabs>

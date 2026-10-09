@@ -10,7 +10,9 @@ export interface LayoutProps {
 
 function Layout({ sidebar, topbar, children, className }: LayoutProps): React.JSX.Element {
   return (
-    <div className={cn('flex h-screen w-screen overflow-hidden bg-lilac-ash-950', className)}>
+    <div
+      className={cn('flex h-screen w-screen overflow-hidden bg-void text-bone-white', className)}
+    >
       {sidebar}
       {/* min-h-0 on both flex items below: without it, a flex item's default
           min-height is its content's natural height, so tall page content
@@ -21,7 +23,9 @@ function Layout({ sidebar, topbar, children, className }: LayoutProps): React.JS
           disappear when the window was shrunk. */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {topbar}
-        <main className="min-h-0 flex-1 overflow-auto bg-lilac-ash-950 p-6">{children}</main>
+        <main className="relative min-h-0 flex-1 overflow-auto bg-void px-8 pt-8 pb-10">
+          {children}
+        </main>
       </div>
     </div>
   )

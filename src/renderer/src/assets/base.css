@@ -1,39 +1,69 @@
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  font-weight: normal;
-}
+/*
+ * Inside `@layer base` on purpose: an unlayered rule always beats layered
+ * Tailwind utilities regardless of specificity, so the old unlayered
+ * `* { margin: 0; font-weight: normal }` reset silently disabled every
+ * `m*-*` and `font-*` utility in the app.
+ */
+@layer base {
+  :root {
+    /* Native controls (select popups, scrollbars, checkboxes) render dark. */
+    color-scheme: dark;
+  }
 
-ul {
-  list-style: none;
-}
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+    margin: 0;
+  }
 
-html,
-body,
-#root {
-  height: 100%;
-}
+  ul {
+    list-style: none;
+  }
 
-body {
-  color: var(--color-lilac-ash-50);
-  background: var(--color-lilac-ash-950);
-  line-height: 1.6;
-  font-family:
-    Inter,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    Oxygen,
-    Ubuntu,
-    Cantarell,
-    'Fira Sans',
-    'Droid Sans',
-    'Helvetica Neue',
-    sans-serif;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    color: var(--color-bone-white);
+    background: var(--color-void);
+    font-family: var(--font-sans);
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 1.6;
+    /* Korean wraps at word (어절) boundaries, not mid-syllable-cluster;
+       overflow-wrap still breaks a single over-long token if it must. */
+    word-break: keep-all;
+    overflow-wrap: break-word;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background: var(--color-electric-iris);
+    color: var(--color-bone-white);
+  }
+
+  /* Quiet, thin scrollbars that sit on the void instead of a bright gutter. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(255 255 255 / 0.14);
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(255 255 255 / 0.24);
+    background-clip: padding-box;
+  }
 }

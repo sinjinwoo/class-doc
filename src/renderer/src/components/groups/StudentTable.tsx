@@ -36,7 +36,7 @@ function StudentTable({
             {sortedFields.map((field) => (
               <Table.Cell
                 key={field.id}
-                className={field.isDisplay ? 'font-medium text-lilac-ash-50' : undefined}
+                className={field.isDisplay ? 'font-semibold text-bone-white' : undefined}
               >
                 {student.values[field.id] ?? ''}
               </Table.Cell>

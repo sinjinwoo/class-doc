@@ -7,8 +7,12 @@ import type {
   TemplateField
 } from '../../../shared/domain'
 import type { GenerationPreviewSummary, GenerationProgressEvent } from '../../../shared/ipc-types'
-import { Alert, Badge, Button, Select, Spinner, useToast } from '../components/ui'
-import { FieldMappingTable, GenerationPreviewViewer, StudentValueTable } from '../components/mapping'
+import { Alert, Badge, Button, PageHeader, Select, Spinner, useToast } from '../components/ui'
+import {
+  FieldMappingTable,
+  GenerationPreviewViewer,
+  StudentValueTable
+} from '../components/mapping'
 
 export interface MappingGenerationPageProps {
   teacherId: number
@@ -234,7 +238,11 @@ function MappingGenerationPage({
     setSelectedStudentIds(checked ? new Set(students.map((s) => s.id)) : new Set())
   }
 
-  function handleChangeStaticValue(studentId: number, templateFieldId: number, value: string): void {
+  function handleChangeStaticValue(
+    studentId: number,
+    templateFieldId: number,
+    value: string
+  ): void {
     setStaticValues((current) => ({
       ...current,
       [studentId]: { ...current[studentId], [templateFieldId]: value }
@@ -307,7 +315,10 @@ function MappingGenerationPage({
 
     setCommitting(true)
     try {
-      const result = await window.api.generationCommit({ previewId: preview.previewId, outputDir: picked })
+      const result = await window.api.generationCommit({
+        previewId: preview.previewId,
+        outputDir: picked
+      })
       toast({
         type: result.failure > 0 ? 'warning' : 'success',
         message: `생성 완료: 성공 ${result.success} / 실패 ${result.failure} (총 ${result.total})`
@@ -350,28 +361,28 @@ function MappingGenerationPage({
       // reachable regardless of that scroll, which the fixed footer below
       // handles on its own — nothing above needs to be squeezed into an
       // exact-fit column for that.
-      <div className="flex flex-col gap-3 pb-24">
+      <div className="flex flex-col gap-4 pb-24">
         {/* Compact single-line header: back + title + success/failure — no
             longer a full Alert box, which cost a whole extra row for what's
             really just two numbers. */}
         <div className="flex shrink-0 flex-wrap items-center gap-3">
-          <Button variant="secondary" onClick={handleEdit} disabled={committing}>
+          <Button variant="ghost" className="-ml-3" onClick={handleEdit} disabled={committing}>
             ← 수정하기
           </Button>
-          <h2 className="text-lg font-semibold text-lilac-ash-50">생성 결과 미리보기</h2>
+          <h2 className="text-title font-normal text-bone-white">생성 결과 미리보기</h2>
           <div className="ml-auto flex items-center gap-2">
             <Badge status="success">성공 {preview.success}</Badge>
             {preview.failure > 0 && <Badge status="danger">실패 {preview.failure}</Badge>}
-            <span className="text-xs text-lilac-ash-400">총 {preview.total}</span>
+            <span className="text-xs text-ash-gray">총 {preview.total}</span>
           </div>
         </div>
 
         {preview.failures.length > 0 && (
-          <div className="flex max-h-20 shrink-0 flex-col gap-1 overflow-y-auto rounded-md border border-almond-silk-700 bg-lilac-ash-900 p-3">
-            <p className="text-xs font-medium text-almond-silk-200">
+          <div className="flex max-h-20 shrink-0 flex-col gap-1 overflow-y-auto rounded-panel border border-danger/35 bg-danger-surface px-4 py-3">
+            <p className="text-xs font-medium text-danger">
               아래 학생은 매핑 오류로 제외되었습니다.
             </p>
-            <ul className="flex flex-col gap-0.5 text-xs text-lilac-ash-300">
+            <ul className="flex flex-col gap-0.5 text-xs text-silver-mist">
               {preview.failures.map((f, i) => (
                 <li key={f.studentId ?? i}>
                   {f.displayValue ?? `학생${f.studentId}`}: {f.message}
@@ -392,7 +403,7 @@ function MappingGenerationPage({
             >
               ← 이전 쪽
             </Button>
-            <span className="text-sm text-lilac-ash-300">
+            <span className="text-sm text-silver-mist tabular-nums">
               {previewPage + 1} / {preview.pageCount} 쪽
             </span>
             <Button
@@ -408,7 +419,7 @@ function MappingGenerationPage({
         {preview.pageCount > 0 ? (
           <GenerationPreviewViewer previewId={preview.previewId} page={previewPage} />
         ) : (
-          <p className="shrink-0 text-sm text-lilac-ash-300">생성 가능한 문서가 없습니다.</p>
+          <p className="shrink-0 text-sm text-ash-gray">생성 가능한 문서가 없습니다.</p>
         )}
 
         {/* Truly `fixed` to the window, not `sticky` within the page's own
@@ -420,14 +431,14 @@ function MappingGenerationPage({
             spans exactly the main content area, not underneath the sidebar.
             The `pb-24` on the page root above reserves room so scrolled
             content never ends up hidden behind this bar. */}
-        <div className="fixed inset-x-0 bottom-0 left-64 z-50 flex items-center gap-3 border-t border-lilac-ash-800 bg-lilac-ash-950 px-6 py-4 shadow-[0_-4px_12px_rgba(0,0,0,0.3)]">
+        <div className="fixed inset-x-0 bottom-0 left-64 z-40 flex items-center gap-3 border-t border-line bg-void px-8 py-4">
           <Button variant="secondary" onClick={handleEdit} disabled={committing}>
             수정하기
           </Button>
           <Button onClick={handleCommit} disabled={preview.success === 0} loading={committing}>
             생성하기
           </Button>
-          <span className="text-sm text-lilac-ash-300">
+          <span className="text-sm text-ash-gray">
             {committing
               ? '저장 위치를 선택하는 창이 뜹니다.'
               : '생성하기를 누르면 저장할 위치를 선택합니다.'}
@@ -438,8 +449,12 @@ function MappingGenerationPage({
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <h2 className="text-lg font-semibold text-lilac-ash-50">필드 매핑 및 문서 생성</h2>
+    <div className="flex flex-col gap-8">
+      <PageHeader
+        eyebrow="문서 만들기"
+        title="필드 매핑 및 문서 생성"
+        description="템플릿의 누름틀마다 어떤 학생 정보를 넣을지 정하고, 선택한 학생들의 문서를 한 파일로 만듭니다."
+      />
 
       {optionsError ? (
         <div className="flex flex-col items-start gap-3">
@@ -478,7 +493,7 @@ function MappingGenerationPage({
           </div>
 
           {templateId === undefined || groupId === undefined ? (
-            <p className="text-sm text-lilac-ash-300">
+            <p className="text-sm text-ash-gray">
               템플릿과 그룹을 모두 선택하면 필드 매핑을 볼 수 있습니다.
             </p>
           ) : mappingError ? (
@@ -498,14 +513,17 @@ function MappingGenerationPage({
             </div>
           ) : (
             <>
-              <FieldMappingTable
-                templateFields={templateFields}
-                groupFields={groupFields}
-                onChangeBinding={handleChangeBinding}
-              />
+              <div className="flex flex-col gap-3">
+                <h3 className="text-heading font-normal text-bone-white">필드 매핑</h3>
+                <FieldMappingTable
+                  templateFields={templateFields}
+                  groupFields={groupFields}
+                  onChangeBinding={handleChangeBinding}
+                />
+              </div>
 
-              <div className="flex flex-col gap-2">
-                <h3 className="text-sm font-semibold text-lilac-ash-50">생성할 학생 선택</h3>
+              <div className="flex flex-col gap-3">
+                <h3 className="text-heading font-normal text-bone-white">생성할 학생 선택</h3>
                 {studentsError ? (
                   <div className="flex flex-col items-start gap-3">
                     <Alert
@@ -522,11 +540,9 @@ function MappingGenerationPage({
                     <Spinner size="lg" />
                   </div>
                 ) : students.length === 0 ? (
-                  <p className="text-sm text-lilac-ash-300">이 그룹에 등록된 학생이 없습니다.</p>
+                  <p className="text-sm text-ash-gray">이 그룹에 등록된 학생이 없습니다.</p>
                 ) : templateFields.length === 0 ? (
-                  <p className="text-sm text-lilac-ash-300">
-                    이 템플릿에는 누름틀 필드가 없습니다.
-                  </p>
+                  <p className="text-sm text-ash-gray">이 템플릿에는 누름틀 필드가 없습니다.</p>
                 ) : (
                   <StudentValueTable
                     templateFields={templateFields}
@@ -546,7 +562,7 @@ function MappingGenerationPage({
                 <Button onClick={handlePrepare} disabled={!canPrepare} loading={preparing}>
                   생성
                 </Button>
-                <span className="text-sm text-lilac-ash-300">
+                <span className="text-sm text-ash-gray">
                   {preparing
                     ? progress
                       ? `${progress.currentStudentName} 처리 중 (${progress.completed}/${progress.total})`

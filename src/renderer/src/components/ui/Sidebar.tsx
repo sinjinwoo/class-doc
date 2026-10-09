@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { cn } from './utils'
+import { cn, focusRing } from './utils'
 
 export interface SidebarNavItem {
   key: string
@@ -20,7 +20,7 @@ function Sidebar({ items, header, footer, className }: SidebarProps): React.JSX.
   return (
     <aside
       className={cn(
-        'flex w-64 shrink-0 flex-col gap-1 border-r border-lilac-ash-700 bg-lilac-ash-950 p-4',
+        'flex w-64 shrink-0 flex-col gap-6 border-r border-line bg-void px-4 py-5',
         className
       )}
     >
@@ -33,13 +33,24 @@ function Sidebar({ items, header, footer, className }: SidebarProps): React.JSX.
             onClick={item.onClick}
             aria-current={item.active ? 'page' : undefined}
             className={cn(
-              'flex items-center gap-2 rounded-md border px-3 py-2.5 text-left text-sm transition-colors duration-150',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-space-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-lilac-ash-950',
+              // DESIGN.md nav: no boxes — inactive items are ash gray,
+              // active is white. A small violet dot marks the current page
+              // (the only accent here; the filled violet stays reserved for
+              // primary actions).
+              'flex items-center gap-3 rounded-card px-4 py-2.5 text-left text-sm transition-colors duration-150',
+              focusRing,
               item.active
-                ? 'border-space-indigo-700 bg-space-indigo-900 text-space-indigo-200'
-                : 'border-lilac-ash-800 bg-lilac-ash-900 text-lilac-ash-200 hover:border-lilac-ash-700 hover:bg-lilac-ash-800 hover:text-lilac-ash-100'
+                ? 'bg-white/[0.06] text-bone-white'
+                : 'text-ash-gray hover:bg-white/[0.03] hover:text-bone-white'
             )}
           >
+            <span
+              aria-hidden="true"
+              className={cn(
+                'h-1.5 w-1.5 shrink-0 rounded-full transition-colors duration-150',
+                item.active ? 'bg-electric-iris' : 'bg-transparent'
+              )}
+            />
             {item.icon}
             {item.label}
           </button>

@@ -26,10 +26,7 @@ function Textarea({
   return (
     <div className="flex flex-col gap-1.5">
       {label && (
-        <label
-          htmlFor={textareaId}
-          className="text-xs font-medium uppercase tracking-wide text-lilac-ash-300"
-        >
+        <label htmlFor={textareaId} className="text-label font-medium uppercase text-ash-gray">
           {label}
         </label>
       )}
@@ -40,19 +37,22 @@ function Textarea({
         disabled={disabled}
         aria-disabled={disabled || undefined}
         className={cn(
-          'h-auto min-h-24 w-full rounded-md border bg-lilac-ash-900 px-3 py-2 text-sm text-lilac-ash-50 placeholder:text-lilac-ash-500 transition-colors duration-150',
-          'focus-visible:outline-none focus-visible:border-space-indigo-400 focus-visible:ring-1 focus-visible:ring-space-indigo-400',
-          hasError ? 'border-almond-silk-500' : 'border-lilac-ash-700',
-          disabled && 'cursor-not-allowed border-lilac-ash-800 bg-lilac-ash-950 text-lilac-ash-500',
+          'h-auto min-h-24 w-full rounded-field border px-3.5 py-2.5 text-sm placeholder:text-dim transition-colors duration-150',
+          'focus-visible:outline-none focus-visible:border-electric-iris focus-visible:ring-2 focus-visible:ring-electric-iris/40',
+          // Exclusive states (not base + override): conflicting color utilities
+          // on one element resolve by stylesheet order, not class order.
+          disabled
+            ? 'cursor-not-allowed border-line bg-void text-dim'
+            : cn(
+                'bg-surface text-bone-white',
+                hasError ? 'border-danger' : 'border-line-strong hover:border-white/25'
+              ),
           className
         )}
         {...props}
       />
       {helper && (
-        <p
-          id={helperId}
-          className={cn('mt-1 text-xs', hasError ? 'text-almond-silk-300' : 'text-lilac-ash-300')}
-        >
+        <p id={helperId} className={cn('text-xs', hasError ? 'text-danger' : 'text-ash-gray')}>
           {helper}
         </p>
       )}

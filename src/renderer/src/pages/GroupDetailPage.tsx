@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { GroupField, StudentWithValues } from '../../../shared/domain'
-import { Alert, Button, EmptyState, Spinner, useToast } from '../components/ui'
+import { Alert, Button, EmptyState, PageHeader, Spinner, useToast } from '../components/ui'
 import { StudentTable } from '../components/groups/StudentTable'
 import { StudentFormModal } from '../components/groups/StudentFormModal'
 import { CsvImportModal } from '../components/groups/CsvImportModal'
@@ -138,24 +138,30 @@ function GroupDetailPage({ groupId, groupName, onBack }: GroupDetailPageProps): 
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="secondary" onClick={onBack}>
+    <div className="flex flex-col gap-8">
+      <PageHeader
+        leading={
+          <Button variant="ghost" className="-ml-3" onClick={onBack}>
             ← 그룹 목록
           </Button>
-          <h2 className="text-lg font-semibold text-lilac-ash-50">{groupName}</h2>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="secondary" onClick={() => setFieldManageModalOpen(true)}>
-            필드 관리
-          </Button>
-          <Button variant="secondary" onClick={() => setCsvModalOpen(true)}>
-            CSV 가져오기
-          </Button>
-          <Button onClick={handleAddStudentClick}>학생 추가</Button>
-        </div>
-      </div>
+        }
+        eyebrow="그룹"
+        title={groupName}
+        description={
+          !loading && !loadError ? `학생 ${students.length}명 · 필드 ${fields.length}개` : undefined
+        }
+        actions={
+          <>
+            <Button variant="secondary" onClick={() => setFieldManageModalOpen(true)}>
+              필드 관리
+            </Button>
+            <Button variant="secondary" onClick={() => setCsvModalOpen(true)}>
+              CSV 가져오기
+            </Button>
+            <Button onClick={handleAddStudentClick}>학생 추가</Button>
+          </>
+        }
+      />
 
       {loading ? (
         <div className="flex justify-center py-10">
@@ -180,7 +186,9 @@ function GroupDetailPage({ groupId, groupName, onBack }: GroupDetailPageProps): 
               <Button variant="secondary" onClick={() => setCsvModalOpen(true)}>
                 CSV 가져오기
               </Button>
-              <Button onClick={handleAddStudentClick}>학생 추가</Button>
+              <Button variant="secondary" onClick={handleAddStudentClick}>
+                학생 추가
+              </Button>
             </div>
           }
         />

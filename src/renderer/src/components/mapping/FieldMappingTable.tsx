@@ -68,13 +68,13 @@ function FieldMappingTable({
               <Table.Cell>
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs text-lilac-ash-200">
+                    <span className="font-mono text-xs text-bone-white">
                       {templateField.fieldName}
                     </span>
                     {templateField.scope === 'ROW' && <Badge status="neutral">반복</Badge>}
                   </div>
                   {status === 'stale' && (
-                    <p className="text-xs text-almond-silk-300">
+                    <p className="text-xs text-danger">
                       이 매핑이 가리키는 필드가 현재 그룹에 없습니다. 다시 매핑해 주세요.
                     </p>
                   )}

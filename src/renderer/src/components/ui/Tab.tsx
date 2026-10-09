@@ -1,5 +1,5 @@
 import type { ComponentPropsWithoutRef } from 'react'
-import { cn } from './utils'
+import { cn, focusRing } from './utils'
 import { panelId, tabId, useTabsContext } from './TabsContext'
 
 export interface TabProps extends Omit<ComponentPropsWithoutRef<'button'>, 'value'> {
@@ -20,9 +20,14 @@ function Tab({ value, className, children, ...props }: TabProps): React.JSX.Elem
       tabIndex={isActive ? 0 : -1}
       onClick={() => onValueChange(value)}
       className={cn(
-        'border-b-2 border-transparent px-4 py-2 text-sm font-medium text-lilac-ash-300 transition-colors duration-150 hover:text-lilac-ash-100',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-space-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-lilac-ash-900',
-        isActive && 'border-space-indigo-400 text-space-indigo-300',
+        '-mb-px border-b-2 px-4 py-2.5 text-sm font-medium transition-colors duration-150',
+        focusRing,
+        // Mutually exclusive (not "base + override") — two border/text color
+        // utilities on one element resolve by stylesheet order, not class
+        // order, which previously hid the active underline entirely.
+        isActive
+          ? 'border-electric-iris text-bone-white'
+          : 'border-transparent text-ash-gray hover:text-bone-white',
         className
       )}
       {...props}

@@ -112,7 +112,7 @@ function StudentFormModal({
         ) : (
           <>
             {inlineFieldKeys.length === 0 && (
-              <p className="text-xs text-lilac-ash-300">
+              <p className="text-xs text-ash-gray">
                 이 그룹에는 아직 필드가 없습니다. 아래에서 필드를 먼저 추가하세요.
               </p>
             )}

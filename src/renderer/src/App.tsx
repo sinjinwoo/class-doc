@@ -9,6 +9,8 @@ import { TemplateLibraryPage } from './pages/TemplateLibraryPage'
 import type { PickedTemplateFile } from './pages/TemplateLibraryPage'
 import { TemplateEditorPage } from './pages/TemplateEditorPage'
 import { MappingGenerationPage } from './pages/MappingGenerationPage'
+import { GuidePage } from './pages/GuidePage'
+import type { GuideTarget } from './pages/GuidePage'
 import { TeacherFormModal } from './components/common/TeacherFormModal'
 import { EditIcon } from './components/groups/icons'
 
@@ -18,13 +20,26 @@ type View =
   | { name: 'templates' }
   | { name: 'template-editor'; templateId?: number; pickedFile?: PickedTemplateFile }
   | { name: 'mapping-generation'; templateId?: number; groupId?: number }
+  | { name: 'guide' }
 
 const VIEW_TITLES: Record<View['name'], string> = {
   groups: '그룹 관리',
   'group-detail': '그룹원',
   templates: '템플릿 라이브러리',
   'template-editor': '템플릿 편집',
-  'mapping-generation': '필드 매핑 및 문서 생성'
+  'mapping-generation': '필드 매핑 및 문서 생성',
+  guide: '사용 가이드'
+}
+
+function guideTargetView(target: GuideTarget): View {
+  switch (target) {
+    case 'groups':
+      return { name: 'groups' }
+    case 'templates':
+      return { name: 'templates' }
+    case 'mapping-generation':
+      return { name: 'mapping-generation' }
+  }
 }
 
 // No router library — 4 screens, local single-user tool, no deep-linking
@@ -46,7 +61,7 @@ function App(): React.JSX.Element {
 
   if (teacher === 'loading') {
     return (
-      <div className="flex h-screen w-screen items-center justify-center bg-lilac-ash-950">
+      <div className="flex h-screen w-screen items-center justify-center bg-void">
         <Spinner size="lg" />
       </div>
     )
@@ -94,6 +109,12 @@ function App(): React.JSX.Element {
       label: '문서 생성',
       active: view.name === 'mapping-generation',
       onClick: () => setView({ name: 'mapping-generation' })
+    },
+    {
+      key: 'guide',
+      label: '사용 가이드',
+      active: view.name === 'guide',
+      onClick: () => setView({ name: 'guide' })
     }
   ]
 
@@ -143,6 +164,8 @@ function App(): React.JSX.Element {
             initialGroupId={view.groupId}
           />
         )
+      case 'guide':
+        return <GuidePage onNavigate={(target) => setView(guideTargetView(target))} />
       default:
         return <></>
     }
@@ -154,7 +177,16 @@ function App(): React.JSX.Element {
         <Sidebar
           items={navItems}
           header={
-            <div className="px-3 py-3 text-base font-semibold text-lilac-ash-50">class-doc</div>
+            // DESIGN.md "logo lockup": a small angular violet mark + white
+            // wordmark — the mark is the only brand graphic in the app.
+            <div className="flex items-center gap-2.5 px-4 py-2">
+              <svg viewBox="0 0 16 16" className="h-4 w-4 text-electric-iris" aria-hidden="true">
+                <path d="M2 14 8.5 2 14 14 8.5 10.5Z" fill="currentColor" />
+              </svg>
+              <span className="text-base font-medium tracking-tight text-bone-white">
+                class-doc
+              </span>
+            </div>
           }
         />
       }

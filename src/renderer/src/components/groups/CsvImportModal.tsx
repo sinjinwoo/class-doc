@@ -103,7 +103,7 @@ function CsvImportModal({ open, onClose, onImport }: CsvImportModalProps): React
           />
           {parseError && <Alert type="error" message={parseError} />}
           {!parseError && headers.length > 0 && (
-            <p className="text-xs text-lilac-ash-300">
+            <p className="text-xs text-ash-gray">
               {fileName ? `${fileName} · ` : ''}
               {headers.length}개 필드, {rows.length}행 감지됨
             </p>
@@ -116,7 +116,7 @@ function CsvImportModal({ open, onClose, onImport }: CsvImportModalProps): React
           <Alert type="info" message={`총 ${rows.length}행을 가져옵니다.`} />
           <Table dense>
             {rows.length > PREVIEW_ROW_LIMIT && (
-              <caption className="mb-2 text-left text-xs text-lilac-ash-400">
+              <caption className="mb-2 text-left text-xs text-ash-gray">
                 상위 {PREVIEW_ROW_LIMIT}행 표시 중 (전체 {rows.length}행)
               </caption>
             )}

@@ -46,9 +46,9 @@ function ConfirmDialog({
         </>
       }
     >
-      <div className="flex flex-col gap-2 text-sm text-lilac-ash-100">
+      <div className="flex flex-col gap-2 text-sm text-bone-white">
         <p>{message}</p>
-        {detail && <p className="text-xs text-lilac-ash-400">{detail}</p>}
+        {detail && <p className="text-xs text-ash-gray">{detail}</p>}
       </div>
     </Modal>
   )

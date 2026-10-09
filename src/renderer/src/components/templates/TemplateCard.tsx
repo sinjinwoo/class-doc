@@ -1,6 +1,7 @@
 import type { MouseEvent } from 'react'
 import type { Template } from '../../../../shared/domain'
 import { Badge, Button, Card } from '../ui'
+import { cn, focusRing } from '../ui/utils'
 import { DeleteIcon } from '../groups/icons'
 
 export interface TemplateCardProps {
@@ -31,7 +32,10 @@ function TemplateCard({ template, onOpen, onDelete }: TemplateCardProps): React.
           onOpen()
         }
       }}
-      className="cursor-pointer transition-colors duration-150 hover:border-space-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-space-indigo-400"
+      className={cn(
+        'cursor-pointer transition-colors duration-150 hover:border-line-strong hover:bg-surface-raised',
+        focusRing
+      )}
       action={
         <div className="flex items-center gap-2">
           <Badge status={template.docType === 'LIST' ? 'warning' : 'neutral'}>
@@ -47,7 +51,7 @@ function TemplateCard({ template, onOpen, onDelete }: TemplateCardProps): React.
         </div>
       }
     >
-      <p className="truncate font-mono text-xs text-lilac-ash-400">{template.fileName}</p>
+      <p className="truncate font-mono text-xs text-ash-gray">{template.fileName}</p>
     </Card>
   )
 }

@@ -46,7 +46,7 @@ function ToastProvider({ children }: ToastProviderProps): React.JSX.Element {
       {children}
       {typeof document !== 'undefined' &&
         createPortal(
-          <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+          <div className="fixed right-5 bottom-5 z-[60] flex flex-col gap-2">
             {toasts.map((item) => (
               <Alert
                 key={item.id}
@@ -54,7 +54,7 @@ function ToastProvider({ children }: ToastProviderProps): React.JSX.Element {
                 message={item.message}
                 detail={item.detail}
                 onDismiss={() => dismiss(item.id)}
-                className="shadow-xl"
+                className="w-[min(420px,calc(100vw-2rem))]"
               />
             ))}
           </div>,

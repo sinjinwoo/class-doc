@@ -9,10 +9,10 @@ export interface BadgeProps extends ComponentPropsWithoutRef<'span'> {
 }
 
 const statusClasses: Record<BadgeStatus, string> = {
-  success: 'bg-dusty-grape-900 text-dusty-grape-300 border-dusty-grape-700',
-  warning: 'bg-parchment-900 text-parchment-300 border-parchment-700',
-  danger: 'bg-almond-silk-900 text-almond-silk-300 border-almond-silk-700',
-  neutral: 'bg-lilac-ash-800 text-lilac-ash-300 border-lilac-ash-700'
+  success: 'border-success/40 text-success',
+  warning: 'border-warning/40 text-warning',
+  danger: 'border-danger/45 text-danger',
+  neutral: 'border-line-strong text-silver-mist'
 }
 
 function Badge({
@@ -24,7 +24,7 @@ function Badge({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium',
+        'inline-flex shrink-0 items-center gap-1 rounded-full border bg-transparent px-2.5 py-0.5 text-xs font-medium whitespace-nowrap',
         statusClasses[status],
         className
       )}

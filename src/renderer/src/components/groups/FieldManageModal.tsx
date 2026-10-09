@@ -99,7 +99,7 @@ function FieldManageModal({
       >
         <div className="flex flex-col gap-4">
           {sortedFields.length === 0 ? (
-            <p className="text-sm text-lilac-ash-300">
+            <p className="text-sm text-ash-gray">
               아직 등록된 필드가 없습니다. 아래에서 필드를 추가하세요.
             </p>
           ) : (
@@ -113,7 +113,7 @@ function FieldManageModal({
               <Table.Body>
                 {sortedFields.map((field) => (
                   <Table.Row key={field.id}>
-                    <Table.Cell className="font-mono text-xs text-lilac-ash-200">
+                    <Table.Cell className="font-mono text-xs text-silver-mist">
                       {field.fieldKey}
                     </Table.Cell>
                     <Table.Cell className="text-right">
@@ -151,7 +151,7 @@ function FieldManageModal({
               필드 추가
             </Button>
           </div>
-          <p className="text-xs text-lilac-ash-400">
+          <p className="text-xs text-ash-gray">
             필드를 삭제하면 모든 학생의 해당 값이 함께 삭제되며, 되돌릴 수 없습니다.
           </p>
         </div>
