@@ -166,8 +166,8 @@ function TemplateEditorPage({
 
       <Alert
         type="info"
-        message="이 화면은 온라인 편집기(rhwp-studio)를 사용하므로 인터넷 연결이 필요합니다."
-        detail="필드는 편집기 안의 '도구 상자 → 입력 → 필드 입력'(Ctrl+K+E) 메뉴로 직접 삽입해 주세요."
+        message="필드(누름틀)는 편집기 안에서 직접 삽입해 주세요."
+        detail="'도구 상자 → 입력 → 필드 입력'(Ctrl+K+E) 메뉴를 사용합니다."
       />
 
       {loadError && (

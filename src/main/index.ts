@@ -5,6 +5,7 @@ import icon from '../../resources/icon.png?asset'
 import { getDataDir, getTemplateDir, getOutputDir } from './paths'
 import { getDb } from './db'
 import { registerIpcHandlers } from './ipc'
+import { startStaticServer } from './localServer'
 
 function createWindow(): void {
   // Create the browser window.
@@ -32,11 +33,15 @@ function createWindow(): void {
   })
 
   // HMR for renderer base on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
+  // Load the remote URL for development; in production, serve the built
+  // renderer over http://127.0.0.1 rather than loadFile(): rhwp-studio's embed
+  // runtime only accepts http(s) parent origins (isUsableParentOrigin() in
+  // rhwp-studio/src/embed/protocol.ts) and silently ignores a file:// parent,
+  // which left the template editor's createEditor() hanging.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    startStaticServer(join(__dirname, '../renderer')).then((url) => mainWindow.loadURL(url))
   }
 }
 

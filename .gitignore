@@ -47,3 +47,6 @@ dist
 class-doc
 img
 # End of https://www.toptal.com/developers/gitignore/api/visualstudiocode,react
+# Self-hosted rhwp-studio build output (scripts/build-rhwp-studio.mjs,
+# run by `npm run build`/`npm run dev`) — regenerated, never committed.
+/resources/rhwp-studio/

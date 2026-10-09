@@ -6,6 +6,7 @@ import { register as registerStudents } from './students'
 import { register as registerTemplates } from './templates'
 import { register as registerTemplateFields } from './templateFields'
 import { register as registerGeneration } from './generation'
+import { register as registerStudio } from './studio'
 
 export function registerIpcHandlers(): void {
   registerTeacher(ipcMain)
@@ -15,4 +16,5 @@ export function registerIpcHandlers(): void {
   registerTemplates(ipcMain)
   registerTemplateFields(ipcMain)
   registerGeneration(ipcMain)
+  registerStudio(ipcMain)
 }
