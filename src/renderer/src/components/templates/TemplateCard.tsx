@@ -1,6 +1,6 @@
 import type { MouseEvent } from 'react'
 import type { Template } from '../../../../shared/domain'
-import { Badge, Button, Card } from '../ui'
+import { Button, Card } from '../ui'
 import { cn, focusRing } from '../ui/utils'
 import { DeleteIcon } from '../groups/icons'
 
@@ -38,9 +38,6 @@ function TemplateCard({ template, onOpen, onDelete }: TemplateCardProps): React.
       )}
       action={
         <div className="flex items-center gap-2">
-          <Badge status={template.docType === 'LIST' ? 'warning' : 'neutral'}>
-            {template.docType === 'LIST' ? '목록형' : '개별형'}
-          </Badge>
           <Button
             variant="ghost"
             size="icon"

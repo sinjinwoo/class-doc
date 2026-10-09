@@ -1,0 +1,69 @@
+# Builds the Windows installer and publishes a GitHub Release when a version
+# tag (e.g. v0.1.0) is pushed.
+#
+#   1. bump "version" in package.json (e.g. 0.2.0) and commit
+#   2. git tag v0.2.0 && git push origin v0.2.0
+#
+# The tag must equal "v" + package.json version: the app's update notice
+# (src/main/updateCheck.ts) compares the latest release tag with its own
+# version, so a mismatch would show a wrong/never-ending "업데이트 가능".
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Check tag matches package.json version
+        run: |
+          PKG_VERSION="v$(node -p "require('./package.json').version")"
+          if [ "$PKG_VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version $PKG_VERSION"
+            exit 1
+          fi
+
+      # --ignore-scripts: skips the postinstall native rebuild of
+      # better-sqlite3 (its bundled N-API prebuild already works under
+      # Electron, see CLAUDE.md) and the electron binary download
+      # (electron-builder fetches its own Electron distribution).
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      # typecheck + scripts/build-rhwp-studio.mjs (clones rhwp at the
+      # @rhwp/core version tag) + electron-vite build.
+      - name: Build app
+        run: npm run build
+
+      - name: Build Windows installer
+        run: npx electron-builder --win --publish never
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: class-doc ${{ github.ref_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: dist/class-doc-*-setup.exe

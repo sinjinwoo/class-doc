@@ -13,6 +13,17 @@ type Step = 'upload' | 'preview'
 
 const PREVIEW_ROW_LIMIT = 50
 
+// Korean Windows Excel's plain "CSV" export is CP949 (EUC-KR), not UTF-8 —
+// only "CSV UTF-8" is. Try strict UTF-8 first (strips a BOM if present) and
+// fall back to EUC-KR so either export reads without mojibake.
+function decodeCsv(bytes: Uint8Array): string {
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+  } catch {
+    return new TextDecoder('euc-kr').decode(bytes)
+  }
+}
+
 function CsvImportModal({ open, onClose, onImport }: CsvImportModalProps): React.JSX.Element {
   const [step, setStep] = useState<Step>('upload')
   const [parseError, setParseError] = useState<string | undefined>(undefined)
@@ -38,12 +49,23 @@ function CsvImportModal({ open, onClose, onImport }: CsvImportModalProps): React
     const file = files[0]
     if (!file) return
 
-    const text = await file.text()
-    const parsed = parseCsv(text)
     setFileName(file.name)
+    const bytes = new Uint8Array(await file.arrayBuffer())
+
+    let parsed: { headers: string[]; rows: Record<string, string>[] }
+    try {
+      parsed = /\.xlsx$/i.test(file.name)
+        ? await window.api.studentParseSpreadsheet({ bytes })
+        : parseCsv(decodeCsv(bytes))
+    } catch (e) {
+      setParseError(e instanceof Error ? e.message : String(e))
+      setHeaders([])
+      setRows([])
+      return
+    }
 
     if (parsed.headers.length === 0 || parsed.rows.length === 0) {
-      setParseError('CSV 파일에서 헤더 또는 데이터 행을 찾을 수 없습니다.')
+      setParseError('파일에서 첫 줄(항목 이름) 또는 학생 데이터 행을 찾을 수 없습니다.')
       setHeaders([])
       setRows([])
       return
@@ -92,14 +114,14 @@ function CsvImportModal({ open, onClose, onImport }: CsvImportModalProps): React
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="CSV 가져오기" footer={renderFooter()}>
+    <Modal open={open} onClose={onClose} title="명단 가져오기" footer={renderFooter()}>
       {step === 'upload' && (
         <div className="flex flex-col gap-3">
           <FileDropzone
-            accept=".csv"
+            accept=".csv,.xlsx"
             onFilesSelected={handleFilesSelected}
-            label="CSV 파일을 드래그하거나 클릭하여 선택하세요"
-            hint="쉼표(,)로 구분된 CSV 파일"
+            label="엑셀(.xlsx) 또는 CSV 파일을 드래그하거나 클릭하여 선택하세요"
+            hint="첫 줄은 항목 이름(예: 반, 번호, 이름)이어야 합니다. 엑셀은 첫 번째 시트를 읽습니다."
           />
           {parseError && <Alert type="error" message={parseError} />}
           {!parseError && headers.length > 0 && (

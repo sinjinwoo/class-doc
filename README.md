@@ -1,2 +1,81 @@
 # class-doc
-교사의 업무 편의를 위해. 한글 메일머지의 기능을 ui, 반 생성 등을 통해 쉽게 하게 해주는 문서 생성 및 편집기
+
+선생님을 위한 학생 문서 자동 생성 프로그램입니다. 한글(HWPX) 문서 양식에 누름틀을 넣어 두고 반 명단을 연결하면, 학생 한 명마다 같은 서식을 채운 문서를 **한 파일로** 만들어 줍니다. 30명이면 30쪽짜리 문서 하나가 만들어지는 식입니다. 한글의 메일 머지 기능을 화면에서 쉽게 쓸 수 있도록 만든 데스크톱 앱입니다.
+
+## 주요 기능
+
+- **반(그룹) 관리**: 엑셀(.xlsx)이나 CSV 명단을 가져오거나 학생을 한 명씩 추가합니다.
+  - 명단의 첫 줄(반, 번호, 이름 등)이 그대로 항목이 됩니다.
+  - 명단을 다시 가져오면 학년·반·번호(명단에 있는 항목)가 같은 학생은 새로 추가되지 않고 정보만 바뀝니다.
+- **템플릿 등록**: HWPX 문서를 앱 안의 편집기에서 열고, **입력 → 필드 입력**(Ctrl+K를 누른 뒤 E)으로 누름틀을 넣어 저장합니다.
+- **문서 생성**: 누름틀마다 넣을 학생 정보(또는 직접 입력값)를 고르고, 결과를 미리 본 뒤 원하는 폴더에 저장합니다.
+- **사용 가이드**: 앱 왼쪽 메뉴의 "사용 가이드"에서 반 등록, 템플릿 등록, 문서 생성 순서를 단계별로 볼 수 있습니다.
+
+## 설치
+
+1. [Releases](https://github.com/sinjinwoo/class-doc/releases) 페이지에서 최신 `class-doc-x.y.z-setup.exe`를 내려받아 실행합니다.
+2. Windows가 "PC 보호" 경고를 띄우면 **추가 정보 → 실행**을 누르세요. 코드 서명이 없는 프로그램이라 나오는 경고입니다.
+3. 설치가 끝나면 바탕화면의 **class-doc** 아이콘으로 실행합니다.
+
+현재는 Windows(64비트)만 지원합니다.
+
+## 업데이트
+
+새 버전이 나오면 앱 왼쪽 아래에 **업데이트 가능** 표시가 나타납니다. 누르면 다운로드 페이지가 열리고, 새 설치 파일을 받아 그대로 설치하면 됩니다. 등록한 반, 템플릿, 만든 문서는 그대로 유지됩니다.
+
+## 개인정보와 데이터 위치
+
+- 학생 명단, 템플릿, 만든 문서 등 **모든 정보는 선생님의 컴퓨터 안에서만** 다루어지며 외부로 전송되지 않습니다.
+- 문서 편집기를 포함한 모든 기능이 인터넷 없이 동작합니다. 인터넷에 연결되어 있으면 새 버전이 있는지만 확인하며, 이때도 학생 정보는 보내지 않습니다.
+- 모든 자료는 프로그램(실행 파일)이 있는 폴더의 `class-doc` 폴더에 저장됩니다. 설치판 기준 위치는 아래와 같고, 앱의 **사용 가이드 → 데이터 폴더 열기**로 바로 열 수 있습니다.
+
+  ```
+  C:\Users\<사용자>\AppData\Local\Programs\class-doc\class-doc\
+  ├─ data\       학생 명단과 설정 (class-doc.sqlite)
+  ├─ template\   등록한 템플릿
+  └─ output\     기본 출력 폴더
+  ```
+
+- **다른 컴퓨터로 옮기기**: 이 `class-doc` 폴더를 통째로 복사해서, 다른 컴퓨터에서도 프로그램과 같은 위치에 두고 실행하면 됩니다.
+- 새 버전을 설치하거나 프로그램을 제거해도 `class-doc` 폴더는 지워지지 않습니다. 완전히 지우려면 위 폴더를 직접 삭제하세요.
+
+---
+
+## 개발
+
+Electron + React + TypeScript(electron-vite)로 만들었습니다. 한글 문서 처리는 [rhwp](https://github.com/edwardkim/rhwp)를 사용합니다.
+- 헤드리스 처리: `@rhwp/core`(WASM)
+- 편집기 화면: `@rhwp/editor` + 직접 빌드해서 내장한 rhwp-studio
+
+구조와 주의사항은 [CLAUDE.md](CLAUDE.md), DB 설계는 [docs/schema.md](docs/schema.md), 화면 디자인 기준은 [docs/DESIGN.md](docs/DESIGN.md)를 참고하세요.
+
+```bash
+npm install          # 의존성 설치
+npm run dev          # 개발 모드 실행 (rhwp-studio가 없으면 먼저 빌드)
+npm run build        # 타입체크 + rhwp-studio 빌드 + 앱 빌드 (out/)
+npx electron .       # 빌드 결과 실행
+npm run build:win    # Windows 설치 파일 생성 (dist/)
+npm run typecheck    # 타입체크
+npm run lint         # ESLint
+```
+
+- `npm run studio:build`는 설치된 `@rhwp/core` 버전에 맞춰 rhwp-studio를 받아 `resources/rhwp-studio/`에 빌드합니다. git과 인터넷이 필요하고, Rust는 필요 없습니다. 결과물은 커밋하지 않습니다.
+- 개발 모드에서는 데이터가 프로젝트 루트의 `class-doc/` 폴더에 저장됩니다(커밋되지 않음).
+- 테스트용 명단은 `temp/`에 두면 커밋되지 않습니다.
+
+### 릴리스
+
+`v`로 시작하는 태그를 푸시하면 GitHub Actions([`.github/workflows/release.yml`](.github/workflows/release.yml))가 Windows 설치 파일을 빌드해 Releases에 올립니다.
+
+```bash
+# 1. package.json의 version을 올리고 커밋 (예: 0.2.0)
+# 2. 같은 버전으로 태그를 만들어 푸시
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+태그는 반드시 `v` + `package.json`의 version과 같아야 합니다. 다르면 워크플로가 실패합니다. 앱의 업데이트 알림이 이 둘을 비교하기 때문입니다.
+
+## 라이선스
+
+[MIT](LICENSE)

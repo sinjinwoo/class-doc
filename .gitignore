@@ -50,3 +50,6 @@ img
 # Self-hosted rhwp-studio build output (scripts/build-rhwp-studio.mjs,
 # run by `npm run build`/`npm run dev`) — regenerated, never committed.
 /resources/rhwp-studio/
+
+# Local test fixtures (sample rosters etc.) — not committed.
+/temp/
