@@ -155,6 +155,14 @@ export interface GenerationPrepareRequest {
    * blank value).
    */
   staticValues?: Record<number, Record<number, string>>
+  /**
+   * One-off students typed in on the generation screen for this document
+   * only — never saved to the group roster. `id` is a renderer-assigned
+   * temporary *negative* number (so it can't collide with a real student id
+   * and can be used in `studentIds`/`staticValues` like any other student);
+   * `values` is keyed by this group's groupFieldId.
+   */
+  extraStudents?: Array<{ id: number; values: Record<number, string> }>
 }
 export interface GenerationPreviewFailure {
   studentId: number | null

@@ -119,7 +119,13 @@ function applyFieldValues(
   const toRemove: string[] = []
 
   for (const templateField of templateFields) {
-    const value = resolveFieldValue(templateField, student, groupFieldByKey, staticValues, teacherName)
+    const value = resolveFieldValue(
+      templateField,
+      student,
+      groupFieldByKey,
+      staticValues,
+      teacherName
+    )
     if (value === '') {
       toRemove.push(templateField.fieldName)
       continue
@@ -147,7 +153,9 @@ function applyFieldValues(
 function getDisplayValue(student: StudentWithValues, groupFields: GroupField[]): string {
   const displayField = groupFields.find((f) => f.isDisplay)
   const raw = displayField ? student.values[displayField.id] : null
-  return raw && raw.trim().length > 0 ? raw : `학생${student.id}`
+  if (raw && raw.trim().length > 0) return raw
+  // One-off students (negative temporary ids, see GenerationPrepareRequest.extraStudents).
+  return student.id < 0 ? `추가학생${-student.id}` : `학생${student.id}`
 }
 
 // Best-effort filename convention per arcjotectire.md ("개별형
@@ -238,7 +246,8 @@ async function prepareIndividual(
   onProgress: (event: GenerationProgressEvent) => void
 ): Promise<PreparedRunResult> {
   const total = ctx.students.length
-  const prepared: Array<{ student: StudentWithValues; displayValue: string; bytes: Uint8Array }> = []
+  const prepared: Array<{ student: StudentWithValues; displayValue: string; bytes: Uint8Array }> =
+    []
   const failures: GenerationPreviewFailure[] = []
 
   for (let i = 0; i < ctx.students.length; i++) {
@@ -294,7 +303,10 @@ async function prepareIndividual(
   return {
     bytes,
     desiredFileName,
-    successEntries: prepared.map((p) => ({ studentId: p.student.id, displayValue: p.displayValue })),
+    successEntries: prepared.map((p) => ({
+      studentId: p.student.id,
+      displayValue: p.displayValue
+    })),
     failures
   }
 }
@@ -422,6 +434,9 @@ function insertDocumentHistory(
   studentNameSnapshot: string | null,
   result: { status: 'SUCCESS'; outputPath: string } | { status: 'FAILURE'; errorMessage: string }
 ): void {
+  // One-off students (negative temporary ids) have no student row to
+  // reference; the name snapshot alone records who the document was for.
+  if (studentId !== null && studentId < 0) studentId = null
   if (result.status === 'SUCCESS') {
     db.prepare(
       `INSERT INTO document_history (run_id, student_id, student_name_snapshot, output_path, status)
@@ -451,8 +466,7 @@ async function prepareGeneration(
   }
 
   const groupRow = db.prepare(SELECT_STUDENT_GROUP).get(payload.groupId) as
-    | { id: number; name: string }
-    | undefined
+    { id: number; name: string } | undefined
   if (!groupRow) {
     throw new Error('그룹을 찾을 수 없습니다.')
   }
@@ -479,7 +493,33 @@ async function prepareGeneration(
   const groupFields = listGroupFields(db, groupRow.id)
   const groupFieldByKey = new Map(groupFields.map((f) => [f.fieldKey, f]))
 
-  const allStudents = listStudentsWithValues(db, groupRow.id)
+  // One-off students for this generation only (not in the DB). Validated
+  // here like everything else from the renderer: negative unique ids, and
+  // only values for this group's own fields.
+  const groupFieldIds = new Set(groupFields.map((f) => f.id))
+  const extraIds = new Set<number>()
+  const extraStudents: StudentWithValues[] = (payload.extraStudents ?? []).map((extra) => {
+    if (!Number.isInteger(extra.id) || extra.id >= 0 || extraIds.has(extra.id)) {
+      throw new Error('추가한 학생 정보가 올바르지 않습니다.')
+    }
+    extraIds.add(extra.id)
+    const values: Record<number, string | null> = {}
+    for (const [fieldId, value] of Object.entries(extra.values ?? {})) {
+      if (groupFieldIds.has(Number(fieldId)) && typeof value === 'string') {
+        values[Number(fieldId)] = value
+      }
+    }
+    return {
+      id: extra.id,
+      groupId: groupRow.id,
+      identityHash: '',
+      createdAt: '',
+      updatedAt: '',
+      values
+    }
+  })
+
+  const allStudents = [...listStudentsWithValues(db, groupRow.id), ...extraStudents]
   const studentIdFilter = payload.studentIds ? new Set(payload.studentIds) : undefined
   const students = studentIdFilter
     ? allStudents.filter((s) => studentIdFilter.has(s.id))
@@ -495,8 +535,7 @@ async function prepareGeneration(
   // Same "single local teacher profile" query as teacher:get (src/main/ipc/teacher.ts)
   // — TEACHER_NAME_BINDING always means *the* teacher, not a per-group/per-template one.
   const teacherRow = db.prepare('SELECT name FROM teacher ORDER BY id LIMIT 1').get() as
-    | { name: string }
-    | undefined
+    { name: string } | undefined
 
   const previewId = randomUUID()
   const ctx: PrepareContext = {
@@ -622,17 +661,23 @@ export function register(ipcMain: IpcMain): void {
     return prepareGeneration(event, payload)
   })
 
-  ipcMain.handle('generation:renderPreviewPage', (_event, payload: GenerationRenderPreviewPageRequest) => {
-    return renderPreviewPage(payload)
-  })
+  ipcMain.handle(
+    'generation:renderPreviewPage',
+    (_event, payload: GenerationRenderPreviewPageRequest) => {
+      return renderPreviewPage(payload)
+    }
+  )
 
   ipcMain.handle('generation:commit', (_event, payload: GenerationCommitRequest) => {
     return commitGeneration(payload)
   })
 
-  ipcMain.handle('generation:discardPreview', (_event, payload: GenerationDiscardPreviewRequest) => {
-    previewCache.delete(payload.previewId)
-  })
+  ipcMain.handle(
+    'generation:discardPreview',
+    (_event, payload: GenerationDiscardPreviewRequest) => {
+      previewCache.delete(payload.previewId)
+    }
+  )
 
   ipcMain.handle('generation:pickOutputDir', async (): Promise<string | null> => {
     const result = await dialog.showOpenDialog({

@@ -1,6 +1,7 @@
 import type { GroupField, StudentWithValues, TemplateField } from '../../../../shared/domain'
 import { STATIC_BINDING, TEACHER_NAME_BINDING } from '../../../../shared/domain'
-import { Checkbox, Input, Table } from '../ui'
+import { Badge, Button, Checkbox, Input, Table } from '../ui'
+import { DeleteIcon } from '../groups/icons'
 import { cn } from '../ui/utils'
 
 export interface StudentValueTableProps {
@@ -15,6 +16,12 @@ export interface StudentValueTableProps {
   onChangeStaticValue: (studentId: number, templateFieldId: number, value: string) => void
   /** The (single, local) teacher's own name — shown read-only for any field mapped to TEACHER_NAME_BINDING. */
   teacherName: string
+  /**
+   * Removes a one-off student (negative temporary id — added on the
+   * generation screen for this document only, never saved to the group).
+   * Only those rows get a remove button.
+   */
+  onRemoveOneOffStudent?: (studentId: number) => void
 }
 
 // The generation-time preview/edit surface (teacher feedback: show the
@@ -33,9 +40,22 @@ function StudentValueTable({
   onToggleAll,
   staticValues,
   onChangeStaticValue,
-  teacherName
+  teacherName,
+  onRemoveOneOffStudent
 }: StudentValueTableProps): React.JSX.Element {
   const groupFieldByKey = new Map(groupFields.map((f) => [f.fieldKey, f]))
+  const displayField = groupFields.find((f) => f.isDisplay)
+
+  // Which student a row is, independent of the template's mapping — when
+  // every field is "직접 입력" the other columns are all blank inputs and the
+  // rows would otherwise be indistinguishable (notably a one-off student
+  // just added on this screen).
+  function studentLabel(student: StudentWithValues): string {
+    const display = displayField ? student.values[displayField.id]?.trim() : ''
+    if (display) return display
+    const first = groupFields.map((f) => student.values[f.id]?.trim()).find((v): v is string => !!v)
+    return first ?? '(이름 없음)'
+  }
 
   return (
     <Table dense>
@@ -50,6 +70,7 @@ function StudentValueTable({
               />
             </div>
           </Table.HeaderCell>
+          <Table.HeaderCell className="w-32">학생</Table.HeaderCell>
           {templateFields.map((templateField) => (
             // A modest, explicit width per field column — the previous
             // "no width at all" left a handful of short columns (이름/나이)
@@ -67,12 +88,28 @@ function StudentValueTable({
         {students.map((student) => (
           <Table.Row key={student.id} selected={selectedStudentIds.has(student.id)}>
             <Table.Cell>
-              <div className="flex justify-center">
+              <div className="flex items-center justify-center gap-1">
                 <Checkbox
                   checked={selectedStudentIds.has(student.id)}
                   onChange={() => onToggleStudent(student.id)}
                   aria-label={`학생 ${student.id} 선택`}
                 />
+                {student.id < 0 && onRemoveOneOffStudent && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    icon={<DeleteIcon className="h-3.5 w-3.5" />}
+                    aria-label="추가한 학생 빼기"
+                    title="이번 문서에만 추가한 학생입니다. 누르면 목록에서 뺍니다."
+                    onClick={() => onRemoveOneOffStudent(student.id)}
+                  />
+                )}
+              </div>
+            </Table.Cell>
+            <Table.Cell>
+              <div className="flex items-center gap-2 whitespace-nowrap">
+                <span className="text-bone-white">{studentLabel(student)}</span>
+                {student.id < 0 && <Badge>추가</Badge>}
               </div>
             </Table.Cell>
             {templateFields.map((templateField) => {

@@ -103,27 +103,8 @@ function TemplatePreviewPanel({ templates }: TemplatePreviewPanelProps): React.J
       )}
 
       <Card className="flex min-h-[70vh] flex-1 flex-col items-stretch gap-4">
-        {/* The mat around the page, not the page itself — the rendered
-            <svg>'s own white page background stays untouched; only this
-            surrounding frame is gray, so the page's edges are clearly
-            visible. max-w/max-h-full + w/h-auto on the injected <svg> is the
-            same "shrink to fit, keep aspect ratio" rule normally used for
-            <img>. */}
-        <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-panel border border-line bg-surface-hover p-4">
-          {loading ? (
-            <Spinner size="lg" />
-          ) : svg ? (
-            <div
-              className="flex h-full w-full items-center justify-center [&>svg]:h-auto [&>svg]:max-h-full [&>svg]:w-auto [&>svg]:max-w-full"
-              // See containsScriptTag() above for the belt-and-suspenders check
-              // applied before this string ever reaches this point.
-              dangerouslySetInnerHTML={{ __html: svg }}
-            />
-          ) : (
-            <div className="text-sm text-ash-gray">렌더링된 페이지가 없습니다.</div>
-          )}
-        </div>
-
+        {/* Page nav sits above the page (not below it) so it's visible without
+            scrolling past a tall rendered page. */}
         {pageCount > 1 && (
           <div className="flex shrink-0 items-center justify-center gap-3">
             <Button
@@ -145,6 +126,26 @@ function TemplatePreviewPanel({ templates }: TemplatePreviewPanelProps): React.J
             </Button>
           </div>
         )}
+        {/* The mat around the page, not the page itself — the rendered
+            <svg>'s own white page background stays untouched; only this
+            surrounding frame is gray, so the page's edges are clearly
+            visible. max-w/max-h-full + w/h-auto on the injected <svg> is the
+            same "shrink to fit, keep aspect ratio" rule normally used for
+            <img>. */}
+        <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-panel border border-line bg-surface-hover p-4">
+          {loading ? (
+            <Spinner size="lg" />
+          ) : svg ? (
+            <div
+              className="flex h-full w-full items-center justify-center [&>svg]:h-auto [&>svg]:max-h-full [&>svg]:w-auto [&>svg]:max-w-full"
+              // See containsScriptTag() above for the belt-and-suspenders check
+              // applied before this string ever reaches this point.
+              dangerouslySetInnerHTML={{ __html: svg }}
+            />
+          ) : (
+            <div className="text-sm text-ash-gray">렌더링된 페이지가 없습니다.</div>
+          )}
+        </div>
       </Card>
     </div>
   )

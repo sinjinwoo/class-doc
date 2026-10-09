@@ -16,7 +16,10 @@ function createWindow(): void {
     minHeight: 640,
     show: false,
     autoHideMenuBar: true,
-    ...(process.platform === 'linux' ? { icon } : {}),
+    // Packaged Windows builds already get the exe's embedded icon
+    // (build/icon.ico); setting it explicitly also covers `npm run dev` and
+    // `npx electron .`, which would otherwise show Electron's default icon.
+    ...(process.platform !== 'darwin' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false

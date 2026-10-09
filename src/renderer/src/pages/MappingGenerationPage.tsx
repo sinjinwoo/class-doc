@@ -13,6 +13,8 @@ import {
   GenerationPreviewViewer,
   StudentValueTable
 } from '../components/mapping'
+import { StudentFormModal } from '../components/groups/StudentFormModal'
+import { PlusIcon } from '../components/groups/icons'
 
 export interface MappingGenerationPageProps {
   teacherId: number
@@ -49,6 +51,13 @@ function MappingGenerationPage({
   const [loadingStudents, setLoadingStudents] = useState(false)
   const [studentsError, setStudentsError] = useState<string | undefined>(undefined)
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<number>>(new Set())
+  const [addStudentOpen, setAddStudentOpen] = useState(false)
+  // One-off students typed in here for this document only — never saved to
+  // the group. Negative temporary ids so they can share selectedStudentIds /
+  // staticValues with real students (see GenerationPrepareRequest.extraStudents).
+  const [oneOffStudents, setOneOffStudents] = useState<StudentWithValues[]>([])
+  const nextOneOffIdRef = useRef(-1)
+  const tableStudents = [...students, ...oneOffStudents]
 
   // Per-student values for "직접 입력" (STATIC_BINDING) template fields,
   // typed directly into StudentValueTable's pivoted preview/edit table.
@@ -166,12 +175,48 @@ function MappingGenerationPage({
     loadStudents()
   }, [loadStudents])
 
+  // Adds a one-off student for this document only (teacher request: not
+  // saved to the group roster). The form returns values keyed by field key;
+  // generation needs them keyed by groupFieldId like real students.
+  function handleAddOneOffStudent(values: Record<string, string>): void {
+    if (groupId === undefined) return
+    const byFieldId: Record<number, string | null> = {}
+    for (const field of groupFields) {
+      const value = values[field.fieldKey]?.trim()
+      if (value) byFieldId[field.id] = value
+    }
+    const id = nextOneOffIdRef.current
+    nextOneOffIdRef.current -= 1
+    setOneOffStudents((current) => [
+      ...current,
+      { id, groupId, identityHash: '', createdAt: '', updatedAt: '', values: byFieldId }
+    ])
+    setSelectedStudentIds((current) => new Set([...current, id]))
+    setAddStudentOpen(false)
+  }
+
+  function handleRemoveOneOffStudent(studentId: number): void {
+    setOneOffStudents((current) => current.filter((s) => s.id !== studentId))
+    setSelectedStudentIds((current) => {
+      const next = new Set(current)
+      next.delete(studentId)
+      return next
+    })
+    setStaticValues((current) => {
+      const next = { ...current }
+      delete next[studentId]
+      return next
+    })
+  }
+
   useEffect(() => {
     // A fresh template/group pairing means a fresh set of "직접 입력" values
     // to fill in — carrying over the previous selection's typed values would
     // silently misapply them to unrelated template fields/students.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setStaticValues({})
+    // One-off students belong to this template/group pairing too.
+    setOneOffStudents([])
   }, [templateId, groupId])
 
   useEffect(() => {
@@ -235,7 +280,7 @@ function MappingGenerationPage({
   }
 
   function toggleAllStudents(checked: boolean): void {
-    setSelectedStudentIds(checked ? new Set(students.map((s) => s.id)) : new Set())
+    setSelectedStudentIds(checked ? new Set(tableStudents.map((s) => s.id)) : new Set())
   }
 
   function handleChangeStaticValue(
@@ -264,12 +309,23 @@ function MappingGenerationPage({
       // default) so the request shape matches exactly what it always used
       // to be in the common case; only send an explicit subset when the
       // teacher deliberately excluded someone.
-      const allSelected = students.length > 0 && selectedStudentIds.size === students.length
+      const allSelected =
+        tableStudents.length > 0 && selectedStudentIds.size === tableStudents.length
       const result = await window.api.generationPrepare({
         templateId,
         groupId,
         ...(allSelected ? {} : { studentIds: Array.from(selectedStudentIds) }),
-        staticValues
+        staticValues,
+        ...(oneOffStudents.length > 0 && {
+          extraStudents: oneOffStudents.map((s) => ({
+            id: s.id,
+            values: Object.fromEntries(
+              Object.entries(s.values).filter(
+                (entry): entry is [string, string] => typeof entry[1] === 'string'
+              )
+            )
+          }))
+        })
       })
       if (mountedRef.current) {
         setPreview(result)
@@ -539,7 +595,7 @@ function MappingGenerationPage({
                   <div className="flex justify-center py-6">
                     <Spinner size="lg" />
                   </div>
-                ) : students.length === 0 ? (
+                ) : tableStudents.length === 0 ? (
                   <p className="text-sm text-ash-gray">이 그룹에 등록된 학생이 없습니다.</p>
                 ) : templateFields.length === 0 ? (
                   <p className="text-sm text-ash-gray">이 템플릿에는 누름틀 필드가 없습니다.</p>
@@ -547,14 +603,33 @@ function MappingGenerationPage({
                   <StudentValueTable
                     templateFields={templateFields}
                     groupFields={groupFields}
-                    students={students}
+                    students={tableStudents}
                     selectedStudentIds={selectedStudentIds}
                     onToggleStudent={toggleStudent}
                     onToggleAll={toggleAllStudents}
                     staticValues={staticValues}
                     onChangeStaticValue={handleChangeStaticValue}
                     teacherName={teacherName}
+                    onRemoveOneOffStudent={handleRemoveOneOffStudent}
                   />
+                )}
+                {groupId !== undefined && !studentsError && !loadingStudents && (
+                  <div className="flex flex-wrap items-center gap-3">
+                    {/* Secondary: violet stays reserved for the 생성 action below. */}
+                    <Button
+                      variant="secondary"
+                      icon={<PlusIcon className="h-4 w-4" />}
+                      onClick={() => setAddStudentOpen(true)}
+                      disabled={groupFields.length === 0}
+                    >
+                      학생 추가
+                    </Button>
+                    <span className="text-xs text-ash-gray">
+                      {groupFields.length === 0
+                        ? '그룹에 항목(필드)이 없어 추가할 수 없습니다. 그룹 관리에서 먼저 명단을 등록해 주세요.'
+                        : '명단에 없는 학생을 이번 문서에만 추가합니다. 그룹 명단에는 저장되지 않습니다.'}
+                    </span>
+                  </div>
                 )}
               </div>
 
@@ -576,6 +651,14 @@ function MappingGenerationPage({
           )}
         </>
       )}
+
+      <StudentFormModal
+        open={addStudentOpen}
+        onClose={() => setAddStudentOpen(false)}
+        fields={groupFields}
+        mode="create"
+        onSubmit={handleAddOneOffStudent}
+      />
     </div>
   )
 }

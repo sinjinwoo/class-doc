@@ -1,6 +1,6 @@
 {
   "name": "class-doc",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "한글 메일머지 문서 생성 및 편집기",
   "main": "./out/main/index.js",
   "author": "sjw0066",
