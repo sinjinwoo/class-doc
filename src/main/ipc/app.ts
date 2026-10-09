@@ -1,10 +1,11 @@
 import { shell, type IpcMain } from 'electron'
 import { getRootDir } from '../paths'
-import { getUpdateStatus, openUpdatePage } from '../updateCheck'
+import { getUpdateStatus, installUpdate, openUpdatePage } from '../updateCheck'
 
 export function register(ipcMain: IpcMain): void {
   ipcMain.handle('app:getUpdateStatus', () => getUpdateStatus())
   ipcMain.handle('app:openUpdatePage', () => openUpdatePage())
+  ipcMain.handle('app:installUpdate', () => installUpdate())
   // The class-doc/ data folder (DB, templates, outputs) in Explorer — for an
   // installed build it's under %LOCALAPPDATA%/Programs/class-doc/, which
   // teachers can't easily find on their own.

@@ -218,16 +218,24 @@ folder on first access.
 
 ## Updates & releases
 
-- Update check is **notify-only** (`src/main/updateCheck.ts`): one
-  unauthenticated GET of this repo's latest GitHub Release, compared against
-  `app.getVersion()`; the sidebar shows "업데이트 가능" and opens the release
-  page. No electron-updater, no download. It's the app's only external
-  request — the guide's 개인정보 안내 text promises exactly that, so keep the
-  two in sync if networking changes.
+- **Auto-update** (`src/main/updateCheck.ts`, from v0.1.2): in a packaged
+  build electron-updater (GitHub provider via `electron-builder.yml`
+  `publish` → `app-update.yml`) downloads a newer release in the
+  background and installs it on quit, or immediately from the sidebar's
+  "업데이트 준비됨 · 재시작" (`quitAndInstall(true, true)`). State is pushed
+  to the renderer on `app:updateStatus`. In dev, or if electron-updater
+  errors (offline, school network blocking GitHub downloads), it falls back
+  to the old notify-only check: one GET of the latest release → "업데이트
+  가능" opening the release page. Builds are unsigned, so electron-updater
+  doesn't verify a publisher signature. Updates run the old version's
+  uninstaller, so `build/installer.nsh` is what keeps teacher data — see
+  Storage layout. These are the app's only external requests; the guide's
+  개인정보 안내 text promises exactly that, so keep the two in sync.
 - `.github/workflows/release.yml` runs on `v*` tag push (windows-latest):
   verifies the tag equals `v` + package.json version, `npm ci
   --ignore-scripts`, `npm run build`, `electron-builder --win --publish
-  never`, then uploads `dist/class-doc-*-setup.exe` to the GitHub Release.
+  never`, then uploads `dist/class-doc-*-setup.exe` plus `latest.yml` and the
+  `.blockmap` (required by electron-updater) to the GitHub Release.
 
 ## Environment gotchas (this machine)
 

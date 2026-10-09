@@ -66,4 +66,10 @@ jobs:
           name: class-doc ${{ github.ref_name }}
           generate_release_notes: true
           fail_on_unmatched_files: true
-          files: dist/class-doc-*-setup.exe
+          # latest.yml + .blockmap are what electron-updater reads
+          # (src/main/updateCheck.ts): the version/sha512 manifest and the
+          # block map for differential downloads.
+          files: |
+            dist/class-doc-*-setup.exe
+            dist/class-doc-*-setup.exe.blockmap
+            dist/latest.yml

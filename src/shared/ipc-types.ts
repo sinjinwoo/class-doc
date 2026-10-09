@@ -213,10 +213,21 @@ export const GENERATION_PROGRESS_CHANNEL = 'generation:progress' as const
 
 // ── the full renderer-facing API surface ───────────────────────────────
 // ── app ─────────────────────────────────────────────────────────────────
+/** Pushed from main whenever the update state changes (see src/main/updateCheck.ts). */
+export const APP_UPDATE_STATUS_CHANNEL = 'app:updateStatus' as const
+
+export type AppUpdateState =
+  | { kind: 'none' }
+  /** Packaged build: a newer release is being downloaded in the background. */
+  | { kind: 'downloading'; version: string; percent: number }
+  /** Downloaded — installs on quit, or now via appInstallUpdate(). */
+  | { kind: 'ready'; version: string }
+  /** Automatic update unavailable (dev build / download failed): link to the release page. */
+  | { kind: 'manual'; version: string; url: string }
+
 export interface AppUpdateStatus {
   currentVersion: string
-  /** Set only when a newer release than currentVersion is published. */
-  update: { version: string; url: string } | null
+  state: AppUpdateState
 }
 
 export interface Api {
@@ -263,10 +274,13 @@ export interface Api {
   /** Local http://127.0.0.1 URL of the self-hosted rhwp-studio (the editor iframe). */
   studioGetUrl(): Promise<string>
 
-  /** Notify-only update check (once per run; silent on failure/offline). */
+  /** Current update state (also pushed via onAppUpdateStatus). */
   appGetUpdateStatus(): Promise<AppUpdateStatus>
-  /** Opens the newer release's page in the default browser. */
+  onAppUpdateStatus(callback: (status: AppUpdateStatus) => void): () => void
+  /** 'manual' state only: opens the newer release's page in the default browser. */
   appOpenUpdatePage(): Promise<void>
+  /** 'ready' state only: restarts the app into the downloaded update. */
+  appInstallUpdate(): Promise<void>
   /** Opens the class-doc data folder (DB/templates/outputs) in Explorer. */
   appOpenDataFolder(): Promise<void>
 }

@@ -499,9 +499,10 @@ function GuidePage({ onNavigate }: GuidePageProps): React.JSX.Element {
           다음부터는 문서 생성만으로 반 전체의 문서를 바로 만들 수 있어요.
         </p>
         {/* Keep in sync with reality: all data lives in the local class-doc/
-            folder (SQLite + template/output files); the only external request
-            is src/main/updateCheck.ts's release-metadata GET (no user data).
-            Adding any other network feature means updating this text. */}
+            folder (SQLite + template/output files); the only external requests
+            are src/main/updateCheck.ts's update check/download from this
+            repo's GitHub Releases (no user data). Adding any other network
+            feature means updating this text. */}
         <div className="mt-3 flex max-w-3xl flex-col gap-1.5 rounded-panel border border-line bg-surface px-5 py-4">
           <p className="text-label font-medium uppercase text-saffron-spark">개인정보 안내</p>
           <p className="text-sm leading-relaxed text-silver-mist">
@@ -509,8 +510,8 @@ function GuidePage({ onNavigate }: GuidePageProps): React.JSX.Element {
             <strong className="font-semibold text-bone-white">선생님의 컴퓨터 안에서만</strong>{' '}
             다루어지며, 외부로 전송되지 않습니다. 모든 자료는 프로그램 옆의{' '}
             <span className="text-bone-white">class-doc</span> 폴더에 저장되고, 편집기를 포함한 모든
-            기능이 인터넷 연결 없이 동작합니다. 인터넷에 연결되어 있으면 새 버전이 나왔는지만
-            확인하며, 이때도 학생 정보는 전혀 보내지 않습니다.
+            기능이 인터넷 연결 없이 동작합니다. 인터넷에 연결되어 있으면 새 버전을 확인해 자동으로
+            내려받고, 프로그램을 닫을 때 설치합니다. 이때도 학생 정보는 전혀 보내지 않습니다.
           </p>
         </div>
         {/* Mirrors src/main/paths.ts: packaged builds store everything in

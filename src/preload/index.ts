@@ -1,8 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import {
+  APP_UPDATE_STATUS_CHANNEL,
   GENERATION_PROGRESS_CHANNEL,
   type Api,
+  type AppUpdateStatus,
   type GenerationProgressEvent
 } from '../shared/ipc-types'
 
@@ -56,7 +58,14 @@ const api: Api = {
   studioGetUrl: () => ipcRenderer.invoke('studio:getUrl'),
 
   appGetUpdateStatus: () => ipcRenderer.invoke('app:getUpdateStatus'),
+  onAppUpdateStatus: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, status: AppUpdateStatus): void =>
+      callback(status)
+    ipcRenderer.on(APP_UPDATE_STATUS_CHANNEL, listener)
+    return () => ipcRenderer.removeListener(APP_UPDATE_STATUS_CHANNEL, listener)
+  },
   appOpenUpdatePage: () => ipcRenderer.invoke('app:openUpdatePage'),
+  appInstallUpdate: () => ipcRenderer.invoke('app:installUpdate'),
   appOpenDataFolder: () => ipcRenderer.invoke('app:openDataFolder')
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "class-doc",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "한글 메일머지 문서 생성 및 편집기",
   "main": "./out/main/index.js",
   "author": "sjw0066",
@@ -28,6 +28,7 @@
     "@rhwp/editor": "^0.8.7",
     "@tailwindcss/vite": "^4.3.3",
     "better-sqlite3": "^13.0.2",
+    "electron-updater": "^6.8.9",
     "exceljs": "^4.4.0",
     "jszip": "^3.10.1",
     "tailwindcss": "^4.3.3"

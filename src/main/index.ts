@@ -6,6 +6,7 @@ import { getDataDir, getTemplateDir, getOutputDir } from './paths'
 import { getDb } from './db'
 import { registerIpcHandlers } from './ipc'
 import { startStaticServer } from './localServer'
+import { startUpdateFlow } from './updateCheck'
 
 function createWindow(): void {
   // Create the browser window.
@@ -53,7 +54,8 @@ function createWindow(): void {
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
   // Set app user model id for windows
-  electronApp.setAppUserModelId('com.electron')
+  // Must match electron-builder.yml's appId (taskbar grouping, notifications).
+  electronApp.setAppUserModelId('com.classdoc.app')
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
@@ -72,6 +74,7 @@ app.whenReady().then(() => {
   registerIpcHandlers()
 
   createWindow()
+  startUpdateFlow()
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the

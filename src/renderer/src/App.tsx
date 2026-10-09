@@ -62,12 +62,15 @@ function App(): React.JSX.Element {
       .catch(() => setTeacher(null))
   }, [])
 
-  // Notify-only; main resolves to "no update" on any failure (offline etc.).
+  // Update state lives in main (src/main/updateCheck.ts): read it once, then
+  // follow pushed changes (download progress → ready). Failures stay silent.
   useEffect(() => {
+    const unsubscribe = window.api.onAppUpdateStatus(setUpdateStatus)
     window.api
       .appGetUpdateStatus()
       .then(setUpdateStatus)
       .catch(() => {})
+    return unsubscribe
   }, [])
 
   if (teacher === 'loading') {
@@ -202,23 +205,38 @@ function App(): React.JSX.Element {
           footer={
             updateStatus && (
               <div className="flex flex-col items-start gap-1.5 px-4">
-                {updateStatus.update && (
+                {updateStatus.state.kind === 'downloading' && (
+                  <p className="flex items-center gap-2 px-1 text-xs text-ash-gray">
+                    <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-ash-gray" />
+                    업데이트 받는 중 · v{updateStatus.state.version} ({updateStatus.state.percent}%)
+                  </p>
+                )}
+                {(updateStatus.state.kind === 'ready' || updateStatus.state.kind === 'manual') && (
                   // Amber = DESIGN.md's emphasis color; violet stays reserved
                   // for each page's single primary action.
                   <button
                     type="button"
-                    onClick={() => window.api.appOpenUpdatePage()}
+                    onClick={() => {
+                      if (updateStatus.state.kind === 'ready') window.api.appInstallUpdate()
+                      else window.api.appOpenUpdatePage()
+                    }}
                     className={cn(
                       'flex items-center gap-2 rounded-full border border-saffron-spark/40 px-3 py-1.5 text-xs font-medium text-saffron-spark transition-colors duration-150 hover:bg-saffron-spark/10',
                       focusRing
                     )}
-                    title="새 버전 다운로드 페이지를 브라우저로 엽니다"
+                    title={
+                      updateStatus.state.kind === 'ready'
+                        ? '지금 다시 시작해 새 버전을 설치합니다. 누르지 않아도 프로그램을 닫을 때 자동으로 설치됩니다.'
+                        : '새 버전 다운로드 페이지를 브라우저로 엽니다'
+                    }
                   >
                     <span
                       aria-hidden="true"
                       className="h-1.5 w-1.5 rounded-full bg-saffron-spark"
                     />
-                    업데이트 가능 · v{updateStatus.update.version}
+                    {updateStatus.state.kind === 'ready'
+                      ? `업데이트 준비됨 · 재시작`
+                      : `업데이트 가능 · v${updateStatus.state.version}`}
                   </button>
                 )}
                 <p className="text-xs text-ash-gray">v{updateStatus.currentVersion}</p>

@@ -53,8 +53,9 @@ appImage:
 # CLAUDE.md); a from-source rebuild needs MSVC + Windows SDK and isn't needed.
 npmRebuild: false
 # Releases are uploaded by .github/workflows/release.yml (electron-builder
-# itself always runs with --publish never). The app only *notifies* about
-# updates (src/main/updateCheck.ts) — no electron-updater.
+# itself always runs with --publish never). This block still matters: it
+# generates the packaged app-update.yml that electron-updater reads
+# (src/main/updateCheck.ts).
 publish:
   provider: github
   owner: sinjinwoo
