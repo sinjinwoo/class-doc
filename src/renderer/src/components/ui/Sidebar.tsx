@@ -33,9 +33,11 @@ function Sidebar({ items, header, footer, className }: SidebarProps): React.JSX.
             onClick={item.onClick}
             aria-current={item.active ? 'page' : undefined}
             className={cn(
-              'flex items-center gap-2 rounded-md px-3 py-2.5 text-left text-sm text-lilac-ash-300 transition-colors duration-150 hover:bg-lilac-ash-800 hover:text-lilac-ash-100',
+              'flex items-center gap-2 rounded-md border px-3 py-2.5 text-left text-sm transition-colors duration-150',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-space-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-lilac-ash-950',
-              item.active && 'bg-space-indigo-900 text-space-indigo-200'
+              item.active
+                ? 'border-space-indigo-700 bg-space-indigo-900 text-space-indigo-200'
+                : 'border-lilac-ash-800 bg-lilac-ash-900 text-lilac-ash-200 hover:border-lilac-ash-700 hover:bg-lilac-ash-800 hover:text-lilac-ash-100'
             )}
           >
             {item.icon}

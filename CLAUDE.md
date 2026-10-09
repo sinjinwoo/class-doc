@@ -88,8 +88,28 @@ package from the similarly-named `create-electron-vite`). Process split:
     request validation lives here (renderer is the untrusted-ish
     boundary); generation progress streams via
     `webContents.send('generation:progress', ...)`.
+    `generation.ts` is a two-phase prepare/commit flow (teacher feedback:
+    preview the merged result before writing anything) — `generation:prepare`
+    builds the merged/list document and caches it in-memory (keyed by a
+    `previewId`, no `generation_run`/`document_history` rows yet),
+    `generation:renderPreviewPage` renders its pages via the same
+    `HwpDocument.renderPageSvg()` path as the template-library preview,
+    `generation:commit` picks the output folder, writes the file, and
+    records the DB rows, and `generation:discardPreview` (or the renderer
+    unmounting mid-preview) just drops the cached entry with no side effects.
   - `util/fileNaming.ts` — filename sanitize/dedupe shared by template
     saves and generated-output writes.
+  - `util/hwpxMerge.ts` — zip/XML-level merge of N per-student HWPX exports
+    (same template, only field values differing) into a single multi-section
+    file. `generation.ts`'s `runIndividual()` now collects every selected
+    student's exported bytes in memory and writes exactly one merged output
+    file per run (a class of 30 → one 30-page document), instead of the
+    original one-file-per-student behavior. See `docs/hwpx-merge-plan.md`
+    for the rejected alternatives (`@rhwp/core`'s clipboard API is isolated
+    per `HwpDocument` instance; `insertTableRow()` doesn't duplicate field
+    controls into the new row) and this approach's still-open caveats (not
+    yet re-verified against a template containing tables/images; per-section
+    page numbering may reset).
 - `src/preload/` — the only bridge between main and renderer
   (`contextBridge`/`index.ts` + `index.d.ts`). `window.api` is fully typed
   against `src/shared/ipc-types.ts`'s `Api` interface — one thin

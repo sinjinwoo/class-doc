@@ -102,26 +102,30 @@ function TemplatePreviewPanel({ templates }: TemplatePreviewPanelProps): React.J
         />
       )}
 
-      <Card className="flex flex-col items-center gap-4">
-        {loading ? (
-          <div className="flex min-h-[480px] items-center justify-center">
+      <Card className="flex min-h-[70vh] flex-1 flex-col items-stretch gap-4">
+        {/* The mat around the page, not the page itself — the rendered
+            <svg>'s own white page background stays untouched; only this
+            surrounding frame is gray, so the page's edges are clearly
+            visible. max-w/max-h-full + w/h-auto on the injected <svg> is the
+            same "shrink to fit, keep aspect ratio" rule normally used for
+            <img>. */}
+        <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-md border border-lilac-ash-800 bg-lilac-ash-700 p-3">
+          {loading ? (
             <Spinner size="lg" />
-          </div>
-        ) : svg ? (
-          <div
-            className="max-h-[70vh] w-full overflow-auto rounded-md border border-lilac-ash-700 bg-white"
-            // See containsScriptTag() above for the belt-and-suspenders check
-            // applied before this string ever reaches this point.
-            dangerouslySetInnerHTML={{ __html: svg }}
-          />
-        ) : (
-          <div className="flex min-h-[480px] items-center justify-center text-sm text-lilac-ash-400">
-            렌더링된 페이지가 없습니다.
-          </div>
-        )}
+          ) : svg ? (
+            <div
+              className="flex h-full w-full items-center justify-center [&>svg]:h-auto [&>svg]:max-h-full [&>svg]:w-auto [&>svg]:max-w-full"
+              // See containsScriptTag() above for the belt-and-suspenders check
+              // applied before this string ever reaches this point.
+              dangerouslySetInnerHTML={{ __html: svg }}
+            />
+          ) : (
+            <div className="text-sm text-lilac-ash-400">렌더링된 페이지가 없습니다.</div>
+          )}
+        </div>
 
         {pageCount > 1 && (
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center justify-center gap-3">
             <Button
               variant="secondary"
               onClick={() => setPage((p) => Math.max(0, p - 1))}

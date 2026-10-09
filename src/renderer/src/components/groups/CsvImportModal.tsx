@@ -1,33 +1,24 @@
 import type { ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
-import type { GroupField } from '../../../../shared/domain'
 import { Alert, Button, FileDropzone, Modal, Table } from '../ui'
 import { parseCsv } from './csvParse'
-import { FieldConfigList, type FieldConfigEntry } from './FieldConfigList'
 
 export interface CsvImportModalProps {
   open: boolean
   onClose: () => void
-  existingFields: GroupField[]
-  onImport: (rows: Record<string, string>[], fieldConfig: FieldConfigEntry[]) => void
+  onImport: (rows: Record<string, string>[], fieldKeys: string[]) => void
 }
 
-type Step = 'upload' | 'configure' | 'preview'
+type Step = 'upload' | 'preview'
 
 const PREVIEW_ROW_LIMIT = 50
 
-function CsvImportModal({
-  open,
-  onClose,
-  existingFields,
-  onImport
-}: CsvImportModalProps): React.JSX.Element {
+function CsvImportModal({ open, onClose, onImport }: CsvImportModalProps): React.JSX.Element {
   const [step, setStep] = useState<Step>('upload')
   const [parseError, setParseError] = useState<string | undefined>(undefined)
   const [fileName, setFileName] = useState<string | undefined>(undefined)
   const [headers, setHeaders] = useState<string[]>([])
   const [rows, setRows] = useState<Record<string, string>[]>([])
-  const [fieldConfig, setFieldConfig] = useState<FieldConfigEntry[]>([])
   const wasOpenRef = useRef(false)
 
   // Reset the whole wizard only on the false -> true transition (a fresh open),
@@ -39,7 +30,6 @@ function CsvImportModal({
       setFileName(undefined)
       setHeaders([])
       setRows([])
-      setFieldConfig([])
     }
     wasOpenRef.current = open
   }, [open])
@@ -56,35 +46,18 @@ function CsvImportModal({
       setParseError('CSV 파일에서 헤더 또는 데이터 행을 찾을 수 없습니다.')
       setHeaders([])
       setRows([])
-      setFieldConfig([])
       return
     }
 
     setParseError(undefined)
     setHeaders(parsed.headers)
     setRows(parsed.rows)
-    // Seed each detected header's isDisplay/isIdentity from this group's existing
-    // field definitions (matched by fieldKey) so re-uploading a CSV doesn't force
-    // the teacher to re-pick the same display/identity fields every time.
-    setFieldConfig(
-      parsed.headers.map((fieldKey) => {
-        const existing = existingFields.find((field) => field.fieldKey === fieldKey)
-        return {
-          fieldKey,
-          isDisplay: existing?.isDisplay ?? false,
-          isIdentity: existing?.isIdentity ?? false
-        }
-      })
-    )
   }
 
   const canProceedFromUpload = !parseError && headers.length > 0 && rows.length > 0
-  const displayCount = fieldConfig.filter((field) => field.isDisplay).length
-  const identityCount = fieldConfig.filter((field) => field.isIdentity).length
-  const canProceedFromConfigure = displayCount === 1 && identityCount >= 1
 
   function handleImport(): void {
-    onImport(rows, fieldConfig)
+    onImport(rows, headers)
     onClose()
   }
 
@@ -98,23 +71,6 @@ function CsvImportModal({
           <Button
             variant="primary"
             disabled={!canProceedFromUpload}
-            onClick={() => setStep('configure')}
-          >
-            다음
-          </Button>
-        </>
-      )
-    }
-
-    if (step === 'configure') {
-      return (
-        <>
-          <Button variant="ghost" onClick={() => setStep('upload')}>
-            이전
-          </Button>
-          <Button
-            variant="primary"
-            disabled={!canProceedFromConfigure}
             onClick={() => setStep('preview')}
           >
             다음
@@ -125,7 +81,7 @@ function CsvImportModal({
 
     return (
       <>
-        <Button variant="ghost" onClick={() => setStep('configure')}>
+        <Button variant="ghost" onClick={() => setStep('upload')}>
           이전
         </Button>
         <Button variant="primary" onClick={handleImport}>
@@ -154,8 +110,6 @@ function CsvImportModal({
           )}
         </div>
       )}
-
-      {step === 'configure' && <FieldConfigList fields={fieldConfig} onChange={setFieldConfig} />}
 
       {step === 'preview' && (
         <div className="flex flex-col gap-3">

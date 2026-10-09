@@ -75,11 +75,17 @@ export type TemplateFieldScope = 'DOC' | 'ROW'
 // group_field lookup" — see docs/schema.md §4 (template_field.binding).
 export const STATIC_BINDING = '__STATIC__' as const
 
+// Sentinel binding value meaning "use the (single, local) teacher's own
+// name" — a document-wide constant like STATIC_BINDING, but auto-filled
+// from the teacher profile (teacher.name) instead of typed in by hand, and
+// the same for every student in a batch (e.g. a "담임교사" field).
+export const TEACHER_NAME_BINDING = '__TEACHER_NAME__' as const
+
 export interface TemplateField {
   id: number
   templateId: number
   fieldName: string
-  binding: string // group_field.fieldKey, or STATIC_BINDING
+  binding: string // group_field.fieldKey, STATIC_BINDING, or TEACHER_NAME_BINDING
   scope: TemplateFieldScope
   required: boolean
   defaultValue: string | null

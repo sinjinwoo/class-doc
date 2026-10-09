@@ -93,12 +93,11 @@ function resolveTemplateField(
  * properties present on `payload` are changed, the rest are carried over
  * from whatever's currently effective for this group (an existing override,
  * or the template-global base row if this is the first override for this
- * group). This single handler backs both of FieldMappingTable's callback
- * shapes — `onChangeBinding(templateFieldId, binding)` sends `{
- * templateFieldId, groupId, binding }` only, `onChangeStatic(templateFieldId,
- * defaultValue, required)` sends `{ templateFieldId, groupId, defaultValue,
- * required }` only — via two thin preload wrapper functions around this one
- * IPC channel.
+ * group). Currently only ever called with `{ templateFieldId, groupId,
+ * binding }` (FieldMappingTable's `onChangeBinding`) — `defaultValue`/
+ * `required` stay patchable here for API completeness, but there's no more
+ * UI that sends them (per-student "직접 입력" values now live in
+ * generation:run's `staticValues` payload instead, see generation.ts).
  *
  * Always writes a full `template_field_override` row (upsert), never patches
  * `template_field` directly (docs/schema.md §4, v3: the base row stays the

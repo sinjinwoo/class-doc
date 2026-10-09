@@ -6,33 +6,20 @@ import type {
   Template,
   TemplateField
 } from '../../../shared/domain'
-import type { GenerationProgressEvent, GenerationSummary } from '../../../shared/ipc-types'
-import {
-  Alert,
-  Button,
-  Card,
-  Checkbox,
-  ProgressBar,
-  Select,
-  Spinner,
-  Table,
-  useToast
-} from '../components/ui'
-import { FieldMappingTable } from '../components/mapping'
+import type { GenerationPreviewSummary, GenerationProgressEvent } from '../../../shared/ipc-types'
+import { Alert, Badge, Button, Select, Spinner, useToast } from '../components/ui'
+import { FieldMappingTable, GenerationPreviewViewer, StudentValueTable } from '../components/mapping'
 
 export interface MappingGenerationPageProps {
   teacherId: number
+  teacherName: string
   initialTemplateId?: number
   initialGroupId?: number
 }
 
-interface LiveTally {
-  success: number
-  failure: number
-}
-
 function MappingGenerationPage({
   teacherId,
+  teacherName,
   initialTemplateId,
   initialGroupId
 }: MappingGenerationPageProps): React.JSX.Element {
@@ -55,22 +42,42 @@ function MappingGenerationPage({
   // roster. Loaded as soon as a group is picked (independent of templateId)
   // since "which students" is a group-scoped question, not a template one.
   const [students, setStudents] = useState<StudentWithValues[]>([])
-  const [studentDisplayFields, setStudentDisplayFields] = useState<GroupField[]>([])
   const [loadingStudents, setLoadingStudents] = useState(false)
   const [studentsError, setStudentsError] = useState<string | undefined>(undefined)
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<number>>(new Set())
+
+  // Per-student values for "직접 입력" (STATIC_BINDING) template fields,
+  // typed directly into StudentValueTable's pivoted preview/edit table.
+  // Ephemeral (not persisted) — reset whenever the template/group selection
+  // changes (see the effect below).
+  const [staticValues, setStaticValues] = useState<Record<number, Record<number, string>>>({})
 
   // Output destination — defaults to the app's own class-doc/output/ folder
   // (server-side, when omitted) unless the teacher explicitly picks one via
   // the native folder dialog.
   const [outputDir, setOutputDir] = useState<string | null>(null)
 
-  const [running, setRunning] = useState(false)
+  // Two-phase generation flow (teacher feedback: preview the merged result
+  // before anything is written to disk or recorded in generation_run/
+  // document_history) — "생성" prepares an in-memory preview and switches to
+  // `phase: 'preview'`; from there, "수정하기" discards it and returns here,
+  // "생성하기" picks a folder and commits it for real. See generation.ts's
+  // prepareGeneration/commitGeneration.
+  const [phase, setPhase] = useState<'form' | 'preview'>('form')
+  const [preview, setPreview] = useState<GenerationPreviewSummary | null>(null)
+  // Which page of the preview is showing — lifted up here (rather than kept
+  // inside GenerationPreviewViewer) so its prev/next controls can live at
+  // the top of the page, next to the title, instead of underneath the image.
+  const [previewPage, setPreviewPage] = useState(0)
+  const [preparing, setPreparing] = useState(false)
+  const [committing, setCommitting] = useState(false)
   const [progress, setProgress] = useState<GenerationProgressEvent | null>(null)
-  const [liveTally, setLiveTally] = useState<LiveTally>({ success: 0, failure: 0 })
-  const [summary, setSummary] = useState<GenerationSummary | null>(null)
   const unsubscribeRef = useRef<(() => void) | null>(null)
   const mountedRef = useRef(true)
+  // Mirrors `preview?.previewId` so the unmount cleanup effect (which must
+  // have an empty dependency array to only run once, on unmount) can read
+  // the *latest* previewId without depending on `preview` itself.
+  const previewIdRef = useRef<string | null>(null)
 
   const loadOptions = useCallback(async () => {
     setOptionsLoading(true)
@@ -130,7 +137,6 @@ function MappingGenerationPage({
   const loadStudents = useCallback(async () => {
     if (groupId === undefined) {
       setStudents([])
-      setStudentDisplayFields([])
       setSelectedStudentIds(new Set())
       setStudentsError(undefined)
       return
@@ -138,12 +144,8 @@ function MappingGenerationPage({
     setLoadingStudents(true)
     setStudentsError(undefined)
     try {
-      const [studentList, fields] = await Promise.all([
-        window.api.studentListWithValues({ groupId }),
-        window.api.groupFieldList({ groupId })
-      ])
+      const studentList = await window.api.studentListWithValues({ groupId })
       setStudents(studentList)
-      setStudentDisplayFields(fields)
       // Default to all-selected — matches today's implicit "always generate
       // for the whole group" behavior, so a teacher who doesn't care about
       // this feature sees no change at all.
@@ -161,6 +163,18 @@ function MappingGenerationPage({
   }, [loadStudents])
 
   useEffect(() => {
+    // A fresh template/group pairing means a fresh set of "직접 입력" values
+    // to fill in — carrying over the previous selection's typed values would
+    // silently misapply them to unrelated template fields/students.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setStaticValues({})
+  }, [templateId, groupId])
+
+  useEffect(() => {
+    previewIdRef.current = preview?.previewId ?? null
+  }, [preview])
+
+  useEffect(() => {
     // Bug fix: must reset to `true` here, not just rely on `useRef(true)`'s
     // initial value. React 18/19 StrictMode (see main.tsx's <StrictMode>)
     // deliberately mounts every component twice in dev — mount, run effects,
@@ -168,16 +182,20 @@ function MappingGenerationPage({
     // this class of bug. `useRef`'s initial value only applies once, ever;
     // the *first* simulated cleanup set `mountedRef.current = false` and
     // nothing set it back to `true` for the real, currently-visible mount,
-    // so every `if (mountedRef.current) ...` guard below (setRunning(false)
-    // in handleGenerate's `finally`, setSummary, the progress-event handler)
-    // silently no-op'd forever after that point — generation genuinely
-    // completed on the backend, but the button stayed stuck in `loading`
-    // and no completion state ever rendered, since the very state updates
-    // that would show it were being dropped by this stale guard.
+    // so every `if (mountedRef.current) ...` guard below silently no-op'd
+    // forever after that point.
     mountedRef.current = true
     return () => {
       mountedRef.current = false
       unsubscribeRef.current?.()
+      // Leaving this page mid-preview (e.g. via the sidebar) without ever
+      // clicking "수정하기"/"생성하기" would otherwise leak the cached
+      // preview in the main process forever (it's only ever cleared by an
+      // explicit discard or commit) — best-effort, nothing user-visible
+      // depends on this succeeding.
+      if (previewIdRef.current) {
+        window.api.generationDiscardPreview({ previewId: previewIdRef.current }).catch(() => {})
+      }
     }
   }, [])
 
@@ -203,30 +221,6 @@ function MappingGenerationPage({
     }
   }
 
-  async function handleChangeStatic(
-    templateFieldId: number,
-    defaultValue: string,
-    required: boolean
-  ): Promise<void> {
-    // See handleChangeBinding's identical comment.
-    if (groupId === undefined) return
-    try {
-      const updated = await window.api.templateFieldUpdateMapping({
-        templateFieldId,
-        groupId,
-        defaultValue,
-        required
-      })
-      setTemplateFields((current) => current.map((f) => (f.id === templateFieldId ? updated : f)))
-    } catch (e) {
-      toast({
-        type: 'error',
-        message: '매핑을 저장하지 못했습니다.',
-        detail: e instanceof Error ? e.message : String(e)
-      })
-    }
-  }
-
   function toggleStudent(studentId: number): void {
     setSelectedStudentIds((current) => {
       const next = new Set(current)
@@ -240,61 +234,40 @@ function MappingGenerationPage({
     setSelectedStudentIds(checked ? new Set(students.map((s) => s.id)) : new Set())
   }
 
-  function studentDisplayName(student: StudentWithValues): string {
-    const displayField = studentDisplayFields.find((f) => f.isDisplay)
-    const raw = displayField ? student.values[displayField.id] : null
-    return raw && raw.trim().length > 0 ? raw : `학생 ${student.id}`
+  function handleChangeStaticValue(studentId: number, templateFieldId: number, value: string): void {
+    setStaticValues((current) => ({
+      ...current,
+      [studentId]: { ...current[studentId], [templateFieldId]: value }
+    }))
   }
 
-  async function handleGenerate(): Promise<void> {
-    if (templateId === undefined || groupId === undefined || running) return
+  async function handlePrepare(): Promise<void> {
+    if (templateId === undefined || groupId === undefined || preparing) return
     if (selectedStudentIds.size === 0) return
 
-    // Save-location picker is part of the "생성" click itself (not a
-    // separate preliminary button) — cancelling the native folder dialog
-    // cancels generation entirely, since the teacher hasn't confirmed where
-    // the output should go.
-    const picked = await window.api.generationPickOutputDir()
-    if (!picked) return
-    setOutputDir(picked)
-
-    setRunning(true)
-    setSummary(null)
+    setPreparing(true)
     setProgress(null)
-    setLiveTally({ success: 0, failure: 0 })
     unsubscribeRef.current = window.api.onGenerationProgress((event) => {
       if (!mountedRef.current) return
       setProgress(event)
-      if (event.lastResult) {
-        const succeeded = event.lastResult.status === 'SUCCESS'
-        setLiveTally((current) => ({
-          success: current.success + (succeeded ? 1 : 0),
-          failure: current.failure + (succeeded ? 0 : 1)
-        }))
-      }
     })
     try {
       // Omit studentIds entirely when every student is selected (today's
       // default) so the request shape matches exactly what it always used
       // to be in the common case; only send an explicit subset when the
-      // teacher deliberately excluded someone. Both are handled identically
-      // by generation.ts's existing `payload.studentIds` filter.
+      // teacher deliberately excluded someone.
       const allSelected = students.length > 0 && selectedStudentIds.size === students.length
-      const result = await window.api.generationRun({
+      const result = await window.api.generationPrepare({
         templateId,
         groupId,
         ...(allSelected ? {} : { studentIds: Array.from(selectedStudentIds) }),
-        outputDir: picked
+        staticValues
       })
-      if (mountedRef.current) setSummary(result)
-      // Fires even if the teacher has already navigated away — the toast
-      // provider lives above this page's mount/unmount, so a "generation
-      // finished while you were elsewhere" notification is intentional, not
-      // a stray update on an unmounted component.
-      toast({
-        type: result.failure > 0 ? 'warning' : 'success',
-        message: `생성 완료: 성공 ${result.success} / 실패 ${result.failure} (총 ${result.total})`
-      })
+      if (mountedRef.current) {
+        setPreview(result)
+        setPreviewPage(0)
+        setPhase('preview')
+      }
     } catch (e) {
       toast({
         type: 'error',
@@ -304,7 +277,53 @@ function MappingGenerationPage({
     } finally {
       unsubscribeRef.current?.()
       unsubscribeRef.current = null
-      if (mountedRef.current) setRunning(false)
+      if (mountedRef.current) setPreparing(false)
+    }
+  }
+
+  async function handleEdit(): Promise<void> {
+    if (!preview) return
+    const previewId = preview.previewId
+    setPreview(null)
+    setPhase('form')
+    try {
+      await window.api.generationDiscardPreview({ previewId })
+    } catch {
+      // Best-effort cleanup only — the cached preview being left behind in
+      // the main process has no user-visible effect (it's just abandoned,
+      // same as the unmount-cleanup path above), so no toast on failure.
+    }
+  }
+
+  async function handleCommit(): Promise<void> {
+    if (!preview || committing) return
+
+    // Save-location picker is part of the "생성하기" click itself (not a
+    // separate preliminary button) — cancelling the native folder dialog
+    // cancels the save and leaves the preview open to try again.
+    const picked = await window.api.generationPickOutputDir()
+    if (!picked) return
+    setOutputDir(picked)
+
+    setCommitting(true)
+    try {
+      const result = await window.api.generationCommit({ previewId: preview.previewId, outputDir: picked })
+      toast({
+        type: result.failure > 0 ? 'warning' : 'success',
+        message: `생성 완료: 성공 ${result.success} / 실패 ${result.failure} (총 ${result.total})`
+      })
+      if (mountedRef.current) {
+        setPreview(null)
+        setPhase('form')
+      }
+    } catch (e) {
+      toast({
+        type: 'error',
+        message: '문서를 저장하지 못했습니다.',
+        detail: e instanceof Error ? e.message : String(e)
+      })
+    } finally {
+      if (mountedRef.current) setCommitting(false)
     }
   }
 
@@ -317,10 +336,106 @@ function MappingGenerationPage({
     ...groups.map((g) => ({ value: String(g.id), label: g.name }))
   ]
 
-  const canGenerate =
-    templateId !== undefined && groupId !== undefined && !running && selectedStudentIds.size > 0
-  const progressPercent =
-    progress && progress.total > 0 ? (progress.completed / progress.total) * 100 : 0
+  const canPrepare =
+    templateId !== undefined && groupId !== undefined && !preparing && selectedStudentIds.size > 0
+
+  if (phase === 'preview' && preview) {
+    return (
+      // Normal block flow, not forced to viewport height — the document is
+      // the point of this screen so it's sized generously (see
+      // GenerationPreviewViewer's Card, min-h-[70vh] — the same frame
+      // TemplatePreviewPanel uses) and the page is simply allowed to scroll
+      // around it on a short window, same as any other page here (Layout.tsx's
+      // <main> already scrolls). Only the action buttons need to stay
+      // reachable regardless of that scroll, which the fixed footer below
+      // handles on its own — nothing above needs to be squeezed into an
+      // exact-fit column for that.
+      <div className="flex flex-col gap-3 pb-24">
+        {/* Compact single-line header: back + title + success/failure — no
+            longer a full Alert box, which cost a whole extra row for what's
+            really just two numbers. */}
+        <div className="flex shrink-0 flex-wrap items-center gap-3">
+          <Button variant="secondary" onClick={handleEdit} disabled={committing}>
+            ← 수정하기
+          </Button>
+          <h2 className="text-lg font-semibold text-lilac-ash-50">생성 결과 미리보기</h2>
+          <div className="ml-auto flex items-center gap-2">
+            <Badge status="success">성공 {preview.success}</Badge>
+            {preview.failure > 0 && <Badge status="danger">실패 {preview.failure}</Badge>}
+            <span className="text-xs text-lilac-ash-400">총 {preview.total}</span>
+          </div>
+        </div>
+
+        {preview.failures.length > 0 && (
+          <div className="flex max-h-20 shrink-0 flex-col gap-1 overflow-y-auto rounded-md border border-almond-silk-700 bg-lilac-ash-900 p-3">
+            <p className="text-xs font-medium text-almond-silk-200">
+              아래 학생은 매핑 오류로 제외되었습니다.
+            </p>
+            <ul className="flex flex-col gap-0.5 text-xs text-lilac-ash-300">
+              {preview.failures.map((f, i) => (
+                <li key={f.studentId ?? i}>
+                  {f.displayValue ?? `학생${f.studentId}`}: {f.message}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Page nav sits directly above the document, like a PDF viewer's
+            own toolbar, instead of far away up in the header. */}
+        {preview.pageCount > 1 && (
+          <div className="flex shrink-0 items-center justify-center gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => setPreviewPage((p) => Math.max(0, p - 1))}
+              disabled={previewPage <= 0}
+            >
+              ← 이전 쪽
+            </Button>
+            <span className="text-sm text-lilac-ash-300">
+              {previewPage + 1} / {preview.pageCount} 쪽
+            </span>
+            <Button
+              variant="secondary"
+              onClick={() => setPreviewPage((p) => Math.min(preview.pageCount - 1, p + 1))}
+              disabled={previewPage >= preview.pageCount - 1}
+            >
+              다음 쪽 →
+            </Button>
+          </div>
+        )}
+
+        {preview.pageCount > 0 ? (
+          <GenerationPreviewViewer previewId={preview.previewId} page={previewPage} />
+        ) : (
+          <p className="shrink-0 text-sm text-lilac-ash-300">생성 가능한 문서가 없습니다.</p>
+        )}
+
+        {/* Truly `fixed` to the window, not `sticky` within the page's own
+            scroll — sticky's guarantee only holds as long as the flex/
+            overflow chain above it never misbehaves, which is exactly what
+            went wrong before. `fixed` pins it to the viewport unconditionally,
+            regardless of how tall this page's content is or whether it
+            scrolls. `left-64` matches Sidebar.tsx's fixed width so the bar
+            spans exactly the main content area, not underneath the sidebar.
+            The `pb-24` on the page root above reserves room so scrolled
+            content never ends up hidden behind this bar. */}
+        <div className="fixed inset-x-0 bottom-0 left-64 z-50 flex items-center gap-3 border-t border-lilac-ash-800 bg-lilac-ash-950 px-6 py-4 shadow-[0_-4px_12px_rgba(0,0,0,0.3)]">
+          <Button variant="secondary" onClick={handleEdit} disabled={committing}>
+            수정하기
+          </Button>
+          <Button onClick={handleCommit} disabled={preview.success === 0} loading={committing}>
+            생성하기
+          </Button>
+          <span className="text-sm text-lilac-ash-300">
+            {committing
+              ? '저장 위치를 선택하는 창이 뜹니다.'
+              : '생성하기를 누르면 저장할 위치를 선택합니다.'}
+          </span>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -387,10 +502,10 @@ function MappingGenerationPage({
                 templateFields={templateFields}
                 groupFields={groupFields}
                 onChangeBinding={handleChangeBinding}
-                onChangeStatic={handleChangeStatic}
               />
 
-              <Card title="생성할 학생 선택">
+              <div className="flex flex-col gap-2">
+                <h3 className="text-sm font-semibold text-lilac-ash-50">생성할 학생 선택</h3>
                 {studentsError ? (
                   <div className="flex flex-col items-start gap-3">
                     <Alert
@@ -408,126 +523,39 @@ function MappingGenerationPage({
                   </div>
                 ) : students.length === 0 ? (
                   <p className="text-sm text-lilac-ash-300">이 그룹에 등록된 학생이 없습니다.</p>
+                ) : templateFields.length === 0 ? (
+                  <p className="text-sm text-lilac-ash-300">
+                    이 템플릿에는 누름틀 필드가 없습니다.
+                  </p>
                 ) : (
-                  <div className="flex flex-col gap-2">
-                    <Checkbox
-                      checked={selectedStudentIds.size === students.length}
-                      onChange={(event) => toggleAllStudents(event.target.checked)}
-                    >
-                      전체 선택 ({selectedStudentIds.size}/{students.length}명)
-                    </Checkbox>
-                    <div className="grid max-h-56 grid-cols-2 gap-x-4 gap-y-1 overflow-y-auto sm:grid-cols-3">
-                      {students.map((student) => (
-                        <Checkbox
-                          key={student.id}
-                          checked={selectedStudentIds.has(student.id)}
-                          onChange={() => toggleStudent(student.id)}
-                        >
-                          {studentDisplayName(student)}
-                        </Checkbox>
-                      ))}
-                    </div>
-                  </div>
+                  <StudentValueTable
+                    templateFields={templateFields}
+                    groupFields={groupFields}
+                    students={students}
+                    selectedStudentIds={selectedStudentIds}
+                    onToggleStudent={toggleStudent}
+                    onToggleAll={toggleAllStudents}
+                    staticValues={staticValues}
+                    onChangeStaticValue={handleChangeStaticValue}
+                    teacherName={teacherName}
+                  />
                 )}
-              </Card>
+              </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                <Button onClick={handleGenerate} disabled={!canGenerate} loading={running}>
+                <Button onClick={handlePrepare} disabled={!canPrepare} loading={preparing}>
                   생성
                 </Button>
                 <span className="text-sm text-lilac-ash-300">
-                  {running
-                    ? '생성 버튼을 누르면 저장 위치를 선택하는 창이 뜹니다.'
+                  {preparing
+                    ? progress
+                      ? `${progress.currentStudentName} 처리 중 (${progress.completed}/${progress.total})`
+                      : '생성 중입니다...'
                     : outputDir
                       ? `마지막 저장 위치: ${outputDir}`
-                      : '생성 버튼을 누르면 저장할 위치를 선택합니다.'}
+                      : '생성 버튼을 누르면 결과를 미리 볼 수 있습니다.'}
                 </span>
               </div>
-
-              {progress && (
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="text-sm text-lilac-ash-300">
-                    {running
-                      ? `${progress.currentStudentName} 처리 중 (${progress.completed}/${progress.total})`
-                      : `완료 (${progress.completed}/${progress.total})`}{' '}
-                    · 성공 {liveTally.success} · 실패 {liveTally.failure}
-                  </span>
-                </div>
-              )}
-
-              {!running && summary && (
-                <Alert
-                  type={summary.failure > 0 ? 'warning' : 'success'}
-                  message={`생성 완료 — 성공 ${summary.success} / 실패 ${summary.failure} (총 ${summary.total})`}
-                  detail={outputDir ? `${outputDir} 폴더에 저장되었습니다.` : undefined}
-                />
-              )}
-
-              {/*
-                Bug fix: this used to be gated on `running` alone
-                (`{running && <ProgressBar .../>}`). `running` and `summary`
-                are both flipped in the same handleGenerate() continuation
-                with no intervening `await` (setSummary(result) happens right
-                before the `finally` block's setRunning(false)), so React
-                batches them into a single commit — the bar could disappear
-                in the very same render that replaces it with the results
-                Card, with no guaranteed frame where the teacher actually
-                sees it reach 100%. Gating on `progress` instead (reset to
-                null only when a *new* run starts, in handleGenerate's own
-                setup) keeps the bar mounted at its last known value through
-                that transition, so it visibly settles at 100% instead of
-                just vanishing. This was investigated and fixed as the
-                "progress bar never visibly fills / appears stuck" report —
-                see this task's final report for how it was diagnosed (a
-                real end-to-end Electron+React reproduction showed
-                `generation:progress` events and their React re-renders both
-                arrive/commit incrementally and well before generation:run's
-                invoke resolves, which rules out cross-process IPC ordering
-                as the cause; this render-gating issue was the one concrete,
-                reproducible defect found in the surrounding UI code).
-              */}
-              {progress && (
-                <ProgressBar
-                  value={progressPercent}
-                  showValue
-                  label={running ? '문서 생성 중' : '문서 생성 완료'}
-                />
-              )}
-
-              {summary && (
-                <Card title="생성 결과">
-                  <Table dense>
-                    <Table.Head>
-                      <Table.Row>
-                        <Table.HeaderCell>구분</Table.HeaderCell>
-                        <Table.HeaderCell>값</Table.HeaderCell>
-                      </Table.Row>
-                    </Table.Head>
-                    <Table.Body>
-                      <Table.Row>
-                        <Table.Cell>실행 번호</Table.Cell>
-                        <Table.Cell>{summary.runId}</Table.Cell>
-                      </Table.Row>
-                      <Table.Row>
-                        <Table.Cell>문서 유형</Table.Cell>
-                        <Table.Cell>{summary.docType === 'LIST' ? '목록형' : '개별형'}</Table.Cell>
-                      </Table.Row>
-                      <Table.Row>
-                        <Table.Cell>전체</Table.Cell>
-                        <Table.Cell>{summary.total}</Table.Cell>
-                      </Table.Row>
-                      <Table.Row>
-                        <Table.Cell>성공</Table.Cell>
-                        <Table.Cell>{summary.success}</Table.Cell>
-                      </Table.Row>
-                      <Table.Row>
-                        <Table.Cell>실패</Table.Cell>
-                        <Table.Cell>{summary.failure}</Table.Cell>
-                      </Table.Row>
-                    </Table.Body>
-                  </Table>
-                </Card>
-              )}
             </>
           )}
         </>

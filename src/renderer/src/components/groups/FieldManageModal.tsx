@@ -1,7 +1,7 @@
 import type { KeyboardEvent } from 'react'
-import { useId, useState } from 'react'
+import { useState } from 'react'
 import type { GroupField } from '../../../../shared/domain'
-import { Button, Checkbox, Input, Modal, Radio, Table, useToast } from '../ui'
+import { Button, Input, Modal, Table, useToast } from '../ui'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import { DeleteIcon } from './icons'
 
@@ -14,13 +14,11 @@ export interface FieldManageModalProps {
   onFieldsChanged: () => Promise<void>
 }
 
-// A dedicated "필드 관리" surface (add/delete a group_field, and set its
-// display/identity flags) — distinct from CsvImportModal's FieldConfigList,
-// whose radio/checkbox changes only stage local FieldConfigEntry state for a
-// pending import. Every control here calls its IPC mutation immediately and
-// re-fetches via `onFieldsChanged`, so this works whether the group already
-// has fields/students or not (unlike StudentFormModal's inline bootstrap
-// flow, which only exists for a brand-new group with zero fields).
+// A dedicated "필드 관리" surface: add/delete a group's dynamic fields. The
+// student-list "이름" column and CSV re-upload identity matching are now
+// derived automatically from conventional column names (see
+// autoAssignFieldRoles in src/main/ipc/groupFields.ts) — there's no more
+// per-field 표시/식별 toggle to expose here.
 function FieldManageModal({
   open,
   onClose,
@@ -29,7 +27,6 @@ function FieldManageModal({
   onFieldsChanged
 }: FieldManageModalProps): React.JSX.Element {
   const { toast } = useToast()
-  const radioGroupName = useId()
 
   const [newFieldKey, setNewFieldKey] = useState('')
   const [adding, setAdding] = useState(false)
@@ -39,37 +36,6 @@ function FieldManageModal({
     (a, b) =>
       (a.displayOrder ?? Number.MAX_SAFE_INTEGER) - (b.displayOrder ?? Number.MAX_SAFE_INTEGER)
   )
-
-  async function handleSetDisplay(field: GroupField): Promise<void> {
-    if (field.isDisplay) return
-    try {
-      await window.api.groupFieldSetDisplay({ groupId, groupFieldId: field.id })
-      await onFieldsChanged()
-    } catch (e) {
-      toast({
-        type: 'error',
-        message: '표시 필드를 지정하지 못했습니다.',
-        detail: e instanceof Error ? e.message : String(e)
-      })
-    }
-  }
-
-  async function handleSetIdentity(field: GroupField, checked: boolean): Promise<void> {
-    try {
-      await window.api.groupFieldSetIdentity({
-        groupId,
-        groupFieldId: field.id,
-        isIdentity: checked
-      })
-      await onFieldsChanged()
-    } catch (e) {
-      toast({
-        type: 'error',
-        message: '식별 필드 설정을 변경하지 못했습니다.',
-        detail: e instanceof Error ? e.message : String(e)
-      })
-    }
-  }
 
   async function handleAddField(): Promise<void> {
     const key = newFieldKey.trim()
@@ -141,8 +107,6 @@ function FieldManageModal({
               <Table.Head>
                 <Table.Row>
                   <Table.HeaderCell>필드</Table.HeaderCell>
-                  <Table.HeaderCell>표시 필드</Table.HeaderCell>
-                  <Table.HeaderCell>식별 필드</Table.HeaderCell>
                   <Table.HeaderCell className="text-right">삭제</Table.HeaderCell>
                 </Table.Row>
               </Table.Head>
@@ -151,21 +115,6 @@ function FieldManageModal({
                   <Table.Row key={field.id}>
                     <Table.Cell className="font-mono text-xs text-lilac-ash-200">
                       {field.fieldKey}
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Radio
-                        name={radioGroupName}
-                        checked={field.isDisplay}
-                        onChange={() => handleSetDisplay(field)}
-                        aria-label={`${field.fieldKey}를 표시 필드로 지정`}
-                      />
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Checkbox
-                        checked={field.isIdentity}
-                        onChange={(event) => handleSetIdentity(field, event.target.checked)}
-                        aria-label={`${field.fieldKey}를 식별 필드로 지정`}
-                      />
                     </Table.Cell>
                     <Table.Cell className="text-right">
                       <Button

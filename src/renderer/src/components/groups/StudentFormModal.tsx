@@ -116,20 +116,13 @@ function StudentFormModal({
                 이 그룹에는 아직 필드가 없습니다. 아래에서 필드를 먼저 추가하세요.
               </p>
             )}
-            {inlineFieldKeys.map((key, index) => (
-              <div key={key} className="flex flex-col gap-1.5">
-                <Input
-                  label={index === 0 ? `${key} *` : key}
-                  required={index === 0}
-                  value={values[key] ?? ''}
-                  onChange={(event) => handleValueChange(key, event.target.value)}
-                />
-                {index === 0 && (
-                  <p className="text-xs text-lilac-ash-400">
-                    첫 필드는 표시 필드 및 식별 필드로 사용됩니다.
-                  </p>
-                )}
-              </div>
+            {inlineFieldKeys.map((key) => (
+              <Input
+                key={key}
+                label={key}
+                value={values[key] ?? ''}
+                onChange={(event) => handleValueChange(key, event.target.value)}
+              />
             ))}
             <div className="flex items-end gap-3">
               <div className="min-w-0 flex-1">

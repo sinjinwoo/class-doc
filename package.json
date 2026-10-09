@@ -27,6 +27,7 @@
     "@rhwp/editor": "^0.8.2",
     "@tailwindcss/vite": "^4.3.3",
     "better-sqlite3": "^13.0.2",
+    "jszip": "^3.10.1",
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
