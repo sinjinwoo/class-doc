@@ -123,7 +123,8 @@ export interface TemplateRenderPreviewResult {
 // which group's `group_field` set it's resolving/overriding against.
 export interface TemplateFieldListRequest {
   templateId: number
-  groupId: number
+  /** Omitted for group-less generation: returns the template-global base mapping. */
+  groupId?: number
 }
 export interface TemplateFieldUpdateMappingRequest {
   templateFieldId: number
@@ -143,7 +144,18 @@ export interface TemplateFieldUpdateMappingRequest {
 // trace, via `generationDiscardPreview`.
 export interface GenerationPrepareRequest {
   templateId: number
-  groupId: number
+  /**
+   * Omitted for group-less ("그룹 없이 직접 입력") generation — then `rows`
+   * supplies every document's data and `studentIds`/`staticValues`/
+   * `extraStudents` are ignored.
+   */
+  groupId?: number
+  /**
+   * Group-less generation only: one entry per document, each keyed by the
+   * template's field *name* (typed in directly or imported from Excel/CSV).
+   * A missing/blank field is left empty, same as a blank "직접 입력" value.
+   */
+  rows?: Array<Record<string, string>>
   studentIds?: number[]
   /**
    * Per-student overrides for STATIC_BINDING ("직접 입력") template fields,

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { useEffect, useRef, useState } from 'react'
 import { Alert, Button, FileDropzone, Modal, Table } from '../ui'
-import { parseCsv } from './csvParse'
+import { decodeCsv, parseCsv } from './csvParse'
 
 export interface CsvImportModalProps {
   open: boolean
@@ -12,17 +12,6 @@ export interface CsvImportModalProps {
 type Step = 'upload' | 'preview'
 
 const PREVIEW_ROW_LIMIT = 50
-
-// Korean Windows Excel's plain "CSV" export is CP949 (EUC-KR), not UTF-8 —
-// only "CSV UTF-8" is. Try strict UTF-8 first (strips a BOM if present) and
-// fall back to EUC-KR so either export reads without mojibake.
-function decodeCsv(bytes: Uint8Array): string {
-  try {
-    return new TextDecoder('utf-8', { fatal: true }).decode(bytes)
-  } catch {
-    return new TextDecoder('euc-kr').decode(bytes)
-  }
-}
 
 function CsvImportModal({ open, onClose, onImport }: CsvImportModalProps): React.JSX.Element {
   const [step, setStep] = useState<Step>('upload')

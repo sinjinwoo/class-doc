@@ -75,6 +75,22 @@ export function listTemplateFieldsForGroup(
   return rows.map(mapTemplateField)
 }
 
+/**
+ * A template's fields with only the template-global base mapping — for
+ * group-less ("그룹 없이 직접 입력") generation, where there is no group whose
+ * override could apply and every field is typed in per row anyway.
+ */
+export function listTemplateFieldsBase(db: Database.Database, templateId: number): TemplateField[] {
+  const rows = db
+    .prepare(
+      `SELECT id, template_id, field_name, binding, scope, required, default_value, display_order
+       FROM template_field WHERE template_id = ?
+       ORDER BY display_order IS NULL, display_order, id`
+    )
+    .all(templateId) as TemplateFieldRow[]
+  return rows.map(mapTemplateField)
+}
+
 function resolveTemplateField(
   db: Database.Database,
   templateFieldId: number,
@@ -142,7 +158,9 @@ export function updateTemplateFieldMapping(
 
 export function register(ipcMain: IpcMain): void {
   ipcMain.handle('templateField:list', (_event, payload: TemplateFieldListRequest) => {
-    return listTemplateFieldsForGroup(getDb(), payload.templateId, payload.groupId)
+    return payload.groupId === undefined
+      ? listTemplateFieldsBase(getDb(), payload.templateId)
+      : listTemplateFieldsForGroup(getDb(), payload.templateId, payload.groupId)
   })
 
   ipcMain.handle(

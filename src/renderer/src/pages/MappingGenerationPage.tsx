@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { STATIC_BINDING } from '../../../shared/domain'
 import type {
   GroupField,
   StudentGroup,
@@ -9,12 +10,18 @@ import type {
 import type { GenerationPreviewSummary, GenerationProgressEvent } from '../../../shared/ipc-types'
 import { Alert, Badge, Button, PageHeader, Select, Spinner, useToast } from '../components/ui'
 import {
+  DirectInputTable,
   FieldMappingTable,
   GenerationPreviewViewer,
-  StudentValueTable
+  SpreadsheetImportModal,
+  StudentValueTable,
+  type DirectInputRow,
+  type ImportTarget
 } from '../components/mapping'
 import { StudentFormModal } from '../components/groups/StudentFormModal'
 import { PlusIcon } from '../components/groups/icons'
+
+const DIRECT_OPTION = 'direct'
 
 export interface MappingGenerationPageProps {
   teacherId: number
@@ -37,6 +44,15 @@ function MappingGenerationPage({
   const [optionsError, setOptionsError] = useState<string | undefined>(undefined)
   const [templateId, setTemplateId] = useState<number | undefined>(initialTemplateId)
   const [groupId, setGroupId] = useState<number | undefined>(initialGroupId)
+  // "그룹 없이 직접 입력" — no group roster at all: each row typed in (or
+  // imported from Excel/CSV) is one document, columns are the template's own
+  // field names. groupId stays undefined in this mode.
+  const [directMode, setDirectMode] = useState(false)
+  const [directRows, setDirectRows] = useState<DirectInputRow[]>(() => [{ key: 0, values: {} }])
+  const nextDirectRowKeyRef = useRef(1)
+  // Which Excel/CSV import is open: rows for group-less mode, or one-off
+  // students added to a group's document.
+  const [importMode, setImportMode] = useState<'direct' | 'group' | null>(null)
 
   const [templateFields, setTemplateFields] = useState<TemplateField[]>([])
   const [groupFields, setGroupFields] = useState<GroupField[]>([])
@@ -116,6 +132,19 @@ function MappingGenerationPage({
   }, [loadOptions])
 
   const loadMapping = useCallback(async () => {
+    if (templateId !== undefined && directMode) {
+      setLoadingMapping(true)
+      setMappingError(undefined)
+      try {
+        setTemplateFields(await window.api.templateFieldList({ templateId }))
+        setGroupFields([])
+      } catch (e) {
+        setMappingError(e instanceof Error ? e.message : String(e))
+      } finally {
+        setLoadingMapping(false)
+      }
+      return
+    }
     if (templateId === undefined || groupId === undefined) {
       setTemplateFields([])
       setGroupFields([])
@@ -139,7 +168,7 @@ function MappingGenerationPage({
     } finally {
       setLoadingMapping(false)
     }
-  }, [templateId, groupId])
+  }, [templateId, groupId, directMode])
 
   useEffect(() => {
     // See GroupsPage.tsx's identical comment — standard fetch-on-selection-change.
@@ -179,20 +208,72 @@ function MappingGenerationPage({
   // saved to the group roster). The form returns values keyed by field key;
   // generation needs them keyed by groupFieldId like real students.
   function handleAddOneOffStudent(values: Record<string, string>): void {
-    if (groupId === undefined) return
-    const byFieldId: Record<number, string | null> = {}
-    for (const field of groupFields) {
-      const value = values[field.fieldKey]?.trim()
-      if (value) byFieldId[field.id] = value
-    }
-    const id = nextOneOffIdRef.current
-    nextOneOffIdRef.current -= 1
-    setOneOffStudents((current) => [
-      ...current,
-      { id, groupId, identityHash: '', createdAt: '', updatedAt: '', values: byFieldId }
-    ])
-    setSelectedStudentIds((current) => new Set([...current, id]))
+    addOneOffStudents([values])
     setAddStudentOpen(false)
+  }
+
+  // Each entry is keyed by group field key, plus `tf:<templateFieldId>` for
+  // a "직접 입력" template field (filled from an Excel/CSV import).
+  function addOneOffStudents(entries: Record<string, string>[]): void {
+    if (groupId === undefined || entries.length === 0) return
+    const added: StudentWithValues[] = []
+    const addedStatic: Record<number, Record<number, string>> = {}
+    for (const values of entries) {
+      const id = nextOneOffIdRef.current
+      nextOneOffIdRef.current -= 1
+      const byFieldId: Record<number, string | null> = {}
+      for (const field of groupFields) {
+        const value = values[field.fieldKey]?.trim()
+        if (value) byFieldId[field.id] = value
+      }
+      for (const field of templateFields) {
+        const value = values[`tf:${field.id}`]?.trim()
+        if (value) (addedStatic[id] ??= {})[field.id] = value
+      }
+      added.push({ id, groupId, identityHash: '', createdAt: '', updatedAt: '', values: byFieldId })
+    }
+    setOneOffStudents((current) => [...current, ...added])
+    setSelectedStudentIds((current) => new Set([...current, ...added.map((s) => s.id)]))
+    setStaticValues((current) => ({ ...current, ...addedStatic }))
+  }
+
+  function handleGroupImport(rows: Record<string, string>[]): void {
+    addOneOffStudents(rows)
+    toast({
+      type: 'success',
+      message: `${rows.length}명을 이번 문서에 추가했습니다. 그룹 명단에는 저장되지 않습니다.`
+    })
+  }
+
+  function newDirectRow(values: Record<string, string> = {}): DirectInputRow {
+    const key = nextDirectRowKeyRef.current
+    nextDirectRowKeyRef.current += 1
+    return { key, values }
+  }
+
+  function isBlankRow(row: DirectInputRow): boolean {
+    return templateFields.every((f) => !row.values[f.fieldName]?.trim())
+  }
+
+  function handleChangeDirectValue(rowKey: number, fieldName: string, value: string): void {
+    setDirectRows((current) =>
+      current.map((row) =>
+        row.key === rowKey ? { ...row, values: { ...row.values, [fieldName]: value } } : row
+      )
+    )
+  }
+
+  function handleRemoveDirectRow(rowKey: number): void {
+    setDirectRows((current) => current.filter((row) => row.key !== rowKey))
+  }
+
+  // Imported rows (already matched to template field names in
+  // SpreadsheetImportModal) are appended after rows already filled in;
+  // untouched blank rows are dropped.
+  function handleDirectImport(rows: Record<string, string>[]): void {
+    const imported = rows.map((values) => newDirectRow(values))
+    setDirectRows((current) => [...current.filter((row) => !isBlankRow(row)), ...imported])
+    toast({ type: 'success', message: `${imported.length}건을 불러왔습니다.` })
   }
 
   function handleRemoveOneOffStudent(studentId: number): void {
@@ -294,9 +375,12 @@ function MappingGenerationPage({
     }))
   }
 
+  const filledDirectRows = directRows.filter((row) => !isBlankRow(row))
+
   async function handlePrepare(): Promise<void> {
-    if (templateId === undefined || groupId === undefined || preparing) return
-    if (selectedStudentIds.size === 0) return
+    if (templateId === undefined || preparing) return
+    if (directMode ? filledDirectRows.length === 0 : groupId === undefined) return
+    if (!directMode && selectedStudentIds.size === 0) return
 
     setPreparing(true)
     setProgress(null)
@@ -311,22 +395,27 @@ function MappingGenerationPage({
       // teacher deliberately excluded someone.
       const allSelected =
         tableStudents.length > 0 && selectedStudentIds.size === tableStudents.length
-      const result = await window.api.generationPrepare({
-        templateId,
-        groupId,
-        ...(allSelected ? {} : { studentIds: Array.from(selectedStudentIds) }),
-        staticValues,
-        ...(oneOffStudents.length > 0 && {
-          extraStudents: oneOffStudents.map((s) => ({
-            id: s.id,
-            values: Object.fromEntries(
-              Object.entries(s.values).filter(
-                (entry): entry is [string, string] => typeof entry[1] === 'string'
-              )
-            )
-          }))
-        })
-      })
+      const result = directMode
+        ? await window.api.generationPrepare({
+            templateId,
+            rows: filledDirectRows.map((row) => row.values)
+          })
+        : await window.api.generationPrepare({
+            templateId,
+            groupId,
+            ...(allSelected ? {} : { studentIds: Array.from(selectedStudentIds) }),
+            staticValues,
+            ...(oneOffStudents.length > 0 && {
+              extraStudents: oneOffStudents.map((s) => ({
+                id: s.id,
+                values: Object.fromEntries(
+                  Object.entries(s.values).filter(
+                    (entry): entry is [string, string] => typeof entry[1] === 'string'
+                  )
+                )
+              }))
+            })
+          })
       if (mountedRef.current) {
         setPreview(result)
         setPreviewPage(0)
@@ -400,11 +489,27 @@ function MappingGenerationPage({
   ]
   const groupOptions = [
     { value: '', label: '그룹을 선택하세요' },
+    { value: DIRECT_OPTION, label: '그룹 없이 (직접 입력 · 엑셀/CSV)' },
     ...groups.map((g) => ({ value: String(g.id), label: g.name }))
   ]
 
+  const directImportTargets: ImportTarget[] = templateFields.map((f) => ({
+    key: f.fieldName,
+    label: f.fieldName
+  }))
+  const groupImportTargets: ImportTarget[] = [
+    ...groupFields.map((f) => ({ key: f.fieldKey, label: f.fieldKey })),
+    ...templateFields
+      .filter((f) => f.binding === STATIC_BINDING)
+      .map((f) => ({ key: `tf:${f.id}`, label: `${f.fieldName} (직접 입력)` }))
+  ]
+
   const canPrepare =
-    templateId !== undefined && groupId !== undefined && !preparing && selectedStudentIds.size > 0
+    templateId !== undefined &&
+    !preparing &&
+    (directMode
+      ? filledDirectRows.length > 0
+      : groupId !== undefined && selectedStudentIds.size > 0)
 
   if (phase === 'preview' && preview) {
     return (
@@ -540,17 +645,20 @@ function MappingGenerationPage({
             />
             <Select
               label="그룹"
-              value={groupId !== undefined ? String(groupId) : ''}
-              onChange={(event) =>
-                setGroupId(event.target.value ? Number(event.target.value) : undefined)
-              }
+              value={directMode ? DIRECT_OPTION : groupId !== undefined ? String(groupId) : ''}
+              onChange={(event) => {
+                const value = event.target.value
+                setDirectMode(value === DIRECT_OPTION)
+                setGroupId(value && value !== DIRECT_OPTION ? Number(value) : undefined)
+              }}
               options={groupOptions}
             />
           </div>
 
-          {templateId === undefined || groupId === undefined ? (
+          {templateId === undefined || (groupId === undefined && !directMode) ? (
             <p className="text-sm text-ash-gray">
-              템플릿과 그룹을 모두 선택하면 필드 매핑을 볼 수 있습니다.
+              템플릿과 그룹을 모두 선택하면 필드 매핑을 볼 수 있습니다. 그룹이 없다면 &lsquo;그룹
+              없이&rsquo;를 골라 직접 입력하거나 엑셀/CSV 파일을 불러올 수 있습니다.
             </p>
           ) : mappingError ? (
             <div className="flex flex-col items-start gap-3">
@@ -566,6 +674,45 @@ function MappingGenerationPage({
           ) : loadingMapping ? (
             <div className="flex justify-center py-10">
               <Spinner size="lg" />
+            </div>
+          ) : directMode ? (
+            <div className="flex flex-col gap-3">
+              <h3 className="text-heading font-normal text-bone-white">문서에 넣을 내용</h3>
+              {templateFields.length === 0 ? (
+                <p className="text-sm text-ash-gray">이 템플릿에는 누름틀 필드가 없습니다.</p>
+              ) : (
+                <>
+                  <p className="text-xs text-ash-gray">
+                    한 줄이 문서 한 장이 됩니다. 비워 둔 칸은 빈칸으로 들어가고, 모두 비어 있는 줄은
+                    건너뜁니다.
+                  </p>
+                  {directRows.length > 0 && (
+                    <DirectInputTable
+                      templateFields={templateFields}
+                      rows={directRows}
+                      onChangeValue={handleChangeDirectValue}
+                      onRemoveRow={handleRemoveDirectRow}
+                    />
+                  )}
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button
+                      variant="secondary"
+                      icon={<PlusIcon className="h-4 w-4" />}
+                      onClick={() => setDirectRows((current) => [...current, newDirectRow()])}
+                    >
+                      줄 추가
+                    </Button>
+                    <Button variant="secondary" onClick={() => setImportMode('direct')}>
+                      엑셀/CSV로 추가하기
+                    </Button>
+                    {directRows.length > 0 && (
+                      <Button variant="ghost" onClick={() => setDirectRows([newDirectRow()])}>
+                        모두 지우기
+                      </Button>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             <>
@@ -624,6 +771,13 @@ function MappingGenerationPage({
                     >
                       학생 추가
                     </Button>
+                    <Button
+                      variant="secondary"
+                      onClick={() => setImportMode('group')}
+                      disabled={groupImportTargets.length === 0}
+                    >
+                      엑셀/CSV로 추가하기
+                    </Button>
                     <span className="text-xs text-ash-gray">
                       {groupFields.length === 0
                         ? '그룹에 항목(필드)이 없어 추가할 수 없습니다. 그룹 관리에서 먼저 명단을 등록해 주세요.'
@@ -632,7 +786,13 @@ function MappingGenerationPage({
                   </div>
                 )}
               </div>
+            </>
+          )}
 
+          {templateId !== undefined &&
+            (groupId !== undefined || directMode) &&
+            !mappingError &&
+            !loadingMapping && (
               <div className="flex flex-wrap items-center gap-3">
                 <Button onClick={handlePrepare} disabled={!canPrepare} loading={preparing}>
                   생성
@@ -647,10 +807,17 @@ function MappingGenerationPage({
                       : '생성 버튼을 누르면 결과를 미리 볼 수 있습니다.'}
                 </span>
               </div>
-            </>
-          )}
+            )}
         </>
       )}
+
+      <SpreadsheetImportModal
+        open={importMode !== null}
+        onClose={() => setImportMode(null)}
+        title={importMode === 'group' ? '엑셀/CSV로 학생 추가' : '엑셀/CSV로 추가하기'}
+        targets={importMode === 'group' ? groupImportTargets : directImportTargets}
+        onImport={importMode === 'group' ? handleGroupImport : handleDirectImport}
+      />
 
       <StudentFormModal
         open={addStudentOpen}

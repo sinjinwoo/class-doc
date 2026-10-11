@@ -64,3 +64,24 @@ function parseCsvLine(line: string): string[] {
   values.push(current.trim())
   return values
 }
+
+// Korean Windows Excel's plain "CSV" export is CP949 (EUC-KR), not UTF-8 —
+// only "CSV UTF-8" is. Try strict UTF-8 first (strips a BOM if present) and
+// fall back to EUC-KR so either export reads without mojibake.
+export function decodeCsv(bytes: Uint8Array): string {
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+  } catch {
+    return new TextDecoder('euc-kr').decode(bytes)
+  }
+}
+
+/** .xlsx (parsed in main) or .csv → header row + rows keyed by header. */
+export async function parseSpreadsheetFile(
+  file: File
+): Promise<{ headers: string[]; rows: Record<string, string>[] }> {
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  return /\.xlsx$/i.test(file.name)
+    ? window.api.studentParseSpreadsheet({ bytes })
+    : parseCsv(decodeCsv(bytes))
+}

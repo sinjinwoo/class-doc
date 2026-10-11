@@ -11,7 +11,7 @@ import { mergeHwpxDocuments } from '../util/hwpxMerge'
 import type { TemplateRow } from '../db/mappers'
 import { listGroupFields } from './groupFields'
 import { listStudentsWithValues } from './students'
-import { listTemplateFieldsForGroup } from './templateFields'
+import { listTemplateFieldsBase, listTemplateFieldsForGroup } from './templateFields'
 import {
   STATIC_BINDING,
   TEACHER_NAME_BINDING,
@@ -216,6 +216,8 @@ interface PrepareContext {
   students: StudentWithValues[]
   staticValues: Map<number, Map<number, string>>
   teacherName: string
+  /** Group-less generation: per-row display labels (there's no display group_field to read). */
+  displayNames?: Map<number, string>
 }
 
 interface PreparedEntry {
@@ -252,7 +254,8 @@ async function prepareIndividual(
 
   for (let i = 0; i < ctx.students.length; i++) {
     const student = ctx.students[i]
-    const displayValue = getDisplayValue(student, ctx.groupFields)
+    const displayValue =
+      ctx.displayNames?.get(student.id) ?? getDisplayValue(student, ctx.groupFields)
 
     try {
       // Template bytes are re-read + re-loaded fresh for every student (per
@@ -413,7 +416,8 @@ async function prepareList(ctx: PrepareContext): Promise<PreparedRunResult> {
 
 interface CachedPreview {
   templateRow: TemplateRow
-  groupRow: { id: number; name: string }
+  /** null for group-less generation (recorded with a NULL group_id). */
+  groupRow: { id: number; name: string } | null
   docType: TemplateDocType
   prepared: PreparedRunResult
   /** Already loaded from `prepared.bytes` so renderPreviewPage doesn't re-parse on every page request; null when `prepared.bytes` is null. */
@@ -465,12 +469,6 @@ async function prepareGeneration(
     throw new Error('템플릿을 찾을 수 없습니다.')
   }
 
-  const groupRow = db.prepare(SELECT_STUDENT_GROUP).get(payload.groupId) as
-    { id: number; name: string } | undefined
-  if (!groupRow) {
-    throw new Error('그룹을 찾을 수 없습니다.')
-  }
-
   // Pre-flight validation, thrown before anything is prepared/cached — see
   // the historical note this used to carry in runList()'s own try/catch:
   // TemplateEditorPage.tsx's docType selector currently offers 'LIST' as a
@@ -483,6 +481,23 @@ async function prepareGeneration(
     throw new Error(
       '이 템플릿은 목록형(여러 학생을 한 문서로 병합)으로 등록되어 있지만, 아직 지원되지 않는 기능입니다. 템플릿을 개별형으로 다시 등록해 사용해 주세요.'
     )
+  }
+
+  const teacherName = selectTeacherName(db)
+  const previewId = randomUUID()
+  const onProgress = (progress: GenerationProgressEvent): void => {
+    event.sender.send(GENERATION_PROGRESS_CHANNEL, progress)
+  }
+
+  if (payload.groupId === undefined) {
+    const ctx = buildGrouplessContext(db, templateRow, payload.rows, teacherName)
+    return runPrepare(ctx, null, previewId, onProgress)
+  }
+
+  const groupRow = db.prepare(SELECT_STUDENT_GROUP).get(payload.groupId) as
+    { id: number; name: string } | undefined
+  if (!groupRow) {
+    throw new Error('그룹을 찾을 수 없습니다.')
   }
 
   // v3 (docs/schema.md §4): must resolve the mapping *for this group*, not
@@ -532,12 +547,6 @@ async function prepareGeneration(
     ])
   )
 
-  // Same "single local teacher profile" query as teacher:get (src/main/ipc/teacher.ts)
-  // — TEACHER_NAME_BINDING always means *the* teacher, not a per-group/per-template one.
-  const teacherRow = db.prepare('SELECT name FROM teacher ORDER BY id LIMIT 1').get() as
-    { name: string } | undefined
-
-  const previewId = randomUUID()
   const ctx: PrepareContext = {
     templateDir: getTemplateDir(),
     templateRow,
@@ -547,13 +556,93 @@ async function prepareGeneration(
     groupName: groupRow.name,
     students,
     staticValues,
-    teacherName: teacherRow?.name ?? ''
+    teacherName
   }
 
-  const onProgress = (progress: GenerationProgressEvent): void => {
-    event.sender.send(GENERATION_PROGRESS_CHANNEL, progress)
+  return runPrepare(ctx, groupRow, previewId, onProgress)
+}
+
+// Same "single local teacher profile" query as teacher:get (src/main/ipc/teacher.ts)
+// — TEACHER_NAME_BINDING always means *the* teacher, not a per-group/per-template one.
+function selectTeacherName(db: Database.Database): string {
+  const teacherRow = db.prepare('SELECT name FROM teacher ORDER BY id LIMIT 1').get() as
+    { name: string } | undefined
+  return teacherRow?.name ?? ''
+}
+
+const GROUPLESS_BATCH_NAME = '직접입력'
+const MAX_GROUPLESS_ROWS = 1000
+
+// Group-less generation ("그룹 없이 직접 입력"): the rows typed in (or
+// imported from Excel/CSV) on the generation screen *are* the data — keyed
+// by template field name. Reuses the group path's machinery by treating each
+// row as a one-off student (negative id) whose every field is "직접 입력".
+function buildGrouplessContext(
+  db: Database.Database,
+  templateRow: TemplateRow,
+  rows: Array<Record<string, string>> | undefined,
+  teacherName: string
+): PrepareContext {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error('문서를 만들 데이터가 없습니다. 행을 추가하거나 엑셀/CSV 파일을 불러와 주세요.')
+  }
+  if (rows.length > MAX_GROUPLESS_ROWS) {
+    throw new Error(`한 번에 ${MAX_GROUPLESS_ROWS}건까지만 생성할 수 있습니다.`)
   }
 
+  const templateFields = listTemplateFieldsBase(db, templateRow.id).map((f) => ({
+    ...f,
+    binding: STATIC_BINDING,
+    defaultValue: null
+  }))
+  // A field literally named like a name column labels the row in progress/
+  // failure messages and the single-document filename; otherwise the first
+  // non-blank value does.
+  const compactName = (f: TemplateField): string => f.fieldName.replace(/\s/g, '')
+  const nameField =
+    templateFields.find((f) => ['이름', '성명', '학생이름'].includes(compactName(f))) ??
+    templateFields.find((f) => compactName(f).includes('이름'))
+
+  const students: StudentWithValues[] = []
+  const staticValues = new Map<number, Map<number, string>>()
+  const displayNames = new Map<number, string>()
+  rows.forEach((row, index) => {
+    const id = -(index + 1)
+    const byField = new Map<number, string>()
+    for (const field of templateFields) {
+      const value = row?.[field.fieldName]
+      if (typeof value === 'string' && value.trim() !== '') byField.set(field.id, value)
+    }
+    staticValues.set(id, byField)
+    students.push({ id, groupId: 0, identityHash: '', createdAt: '', updatedAt: '', values: {} })
+    const label =
+      (nameField && byField.get(nameField.id)?.trim()) ||
+      [...byField.values()].map((v) => v.trim()).find((v) => v) ||
+      `${index + 1}번째 행`
+    displayNames.set(id, label)
+  })
+
+  return {
+    templateDir: getTemplateDir(),
+    templateRow,
+    templateFields,
+    groupFields: [],
+    groupFieldByKey: new Map(),
+    groupName: GROUPLESS_BATCH_NAME,
+    students,
+    staticValues,
+    teacherName,
+    displayNames
+  }
+}
+
+async function runPrepare(
+  ctx: PrepareContext,
+  groupRow: { id: number; name: string } | null,
+  previewId: string,
+  onProgress: (progress: GenerationProgressEvent) => void
+): Promise<GenerationPreviewSummary> {
+  const { templateRow, students } = ctx
   const prepared =
     templateRow.doc_type === 'LIST'
       ? await prepareList(ctx)
@@ -620,7 +709,14 @@ function commitGeneration(payload: GenerationCommitRequest): GenerationSummary {
          (template_id, template_name_snapshot, group_id, group_name_snapshot, doc_type_snapshot, total_count)
        VALUES (?, ?, ?, ?, ?, ?)`
     )
-    .run(templateRow.id, templateRow.name, groupRow.id, groupRow.name, docType, total)
+    .run(
+      templateRow.id,
+      templateRow.name,
+      groupRow?.id ?? null,
+      groupRow?.name ?? null,
+      docType,
+      total
+    )
   const runId = Number(runResult.lastInsertRowid)
 
   let outputPath: string | null = null

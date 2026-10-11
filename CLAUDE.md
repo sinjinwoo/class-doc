@@ -98,6 +98,10 @@ package from the similarly-named `create-electron-vite`). Process split:
     `generation:commit` picks the output folder, writes the file, and
     records the DB rows, and `generation:discardPreview` (or the renderer
     unmounting mid-preview) just drops the cached entry with no side effects.
+    `generation:prepare` without a `groupId` is group-less generation: the
+    request's `rows` (keyed by template field name — typed in, or an
+    Excel/CSV import matched by header) are treated as one-off students with
+    every field "직접 입력", and the run is recorded with a NULL `group_id`.
   - `util/fileNaming.ts` — filename sanitize/dedupe shared by template
     saves and generated-output writes.
   - `util/hwpxMerge.ts` — zip/XML-level merge of N per-student HWPX exports

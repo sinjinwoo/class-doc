@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react'
 import { useState } from 'react'
-import { Button, Tab, TabList, TabPanel, Tabs } from '../components/ui'
+import { Button, Tab, TabList, TabPanel, Tabs, useToast } from '../components/ui'
+
+const CONTACT_EMAIL = 'devsin0723@gmail.com'
 
 export type GuideTarget = 'groups' | 'templates' | 'mapping-generation'
 
@@ -488,6 +490,16 @@ function GuideSectionView({
 
 function GuidePage({ onNavigate }: GuidePageProps): React.JSX.Element {
   const [activeTab, setActiveTab] = useState<GuideTab>('groups')
+  const { toast } = useToast()
+
+  async function copyContactEmail(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(CONTACT_EMAIL)
+      toast({ type: 'success', message: '이메일 주소를 복사했습니다.' })
+    } catch {
+      toast({ type: 'error', message: '복사하지 못했습니다. 주소를 직접 적어 주세요.' })
+    }
+  }
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-10">
@@ -537,6 +549,18 @@ function GuidePage({ onNavigate }: GuidePageProps): React.JSX.Element {
               }}
             >
               데이터 폴더 열기
+            </Button>
+          </div>
+        </div>
+        <div className="flex max-w-3xl flex-col gap-1.5 rounded-panel border border-line bg-surface px-5 py-4">
+          <p className="text-label font-medium uppercase text-saffron-spark">문의</p>
+          <p className="text-sm leading-relaxed text-silver-mist">
+            사용 중 궁금한 점이나 오류, 바라는 기능이 있으면 이메일로 알려 주세요.
+          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-3">
+            <span className="select-all text-sm text-bone-white">{CONTACT_EMAIL}</span>
+            <Button variant="secondary" onClick={copyContactEmail}>
+              주소 복사
             </Button>
           </div>
         </div>
